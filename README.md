@@ -60,17 +60,18 @@ skipped: `[dsh-element-picker] inserted via "…" (caret=placed routes[…])`.
 
 - `inputActions.paste` is **not exposed** to plugins, so the first path only
   exists as a feature-detected placeholder for a build that does expose it.
-- A synthetic paste event is **refused** by the real editor (no listener claims
-  it), and `execCommand('insertText')` **flattens the newlines** of a multi-line
-  block, so the `dom` path does not win there.
-- `setDraft` therefore carries the insert. That is correct output-wise: the
-  fields land in order, one per line, and the text already in the draft
-  survives. The cost is that a reference chip already in the draft is flattened
-  to its plain-text form (`@path` stays as text, but is no longer a chip).
-- `document.execCommand('undo')` does **not** roll an `execCommand` insert back
-  in that editor, which is why no per-line DOM strategy is attempted: a partial
-  insert could not be undone. `setDraft(draft + text)` is idempotent, so it
-  repairs anything a failed DOM route left behind.
+- The `dom` path loses there in every variant: a synthetic paste event is
+  **refused** (no listener claims it), `execCommand('insertText')` **flattens the
+  newlines** of a multi-line block and reorders its fields, and in a later state
+  both `insertText` and `insertParagraph` **report success while changing
+  nothing** at all. `undo` does not roll such an insert back either.
+- `setDraft` therefore carries the insert, and the result is structurally right:
+  the editor's DOM shows one `<p>` per field, in order, with the text already in
+  the draft kept on the first line. The cost is that a reference chip already in
+  the draft is flattened to its plain-text form (`@path` stays as text, but is no
+  longer a chip).
+- `setDraft(draft + text)` is idempotent, so it also repairs anything a failed
+  DOM route might have left behind.
 
 ## Repository policy: cloud-only
 
