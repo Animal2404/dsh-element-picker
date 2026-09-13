@@ -11,7 +11,19 @@
  */
 import React from 'react'
 
-import { chipLabel, insertElementChip, registerChipSource } from './chip.js'
+import {
+  CHIP_BLOCK_ATTR,
+  CHIP_SOURCE,
+  chipLabel,
+  decorateChips,
+  insertElementChip,
+  registerChipSource,
+  rememberChip,
+  rememberedBlock,
+  removeChipElement,
+  resolveFacade,
+  watchChips,
+} from './chip.js'
 import { buildElementBlock } from './describe.js'
 import { insertBlock } from './insert.js'
 import { createPicker } from './overlay.js'
@@ -195,6 +207,16 @@ function insertPickedElement(element, detailed = false) {
       onEvent: (message) => log(message),
     })
     if (chip !== null) {
+      const chipElement = lastPickerChip(doc)
+      if (chipElement !== null) {
+        rememberChip(chipElement, text)
+        try {
+          chipElement.setAttribute(CHIP_BLOCK_ATTR, encodeURIComponent(text))
+        } catch {
+          /* an attribute is a convenience, never a requirement */
+        }
+      }
+      decorateChips({ doc, onRemove: removePickedChip })
       log(`inserted a ${chip} for ${element.tagName.toLowerCase()}`)
       return
     }
@@ -215,6 +237,36 @@ function insertPickedElement(element, detailed = false) {
     return
   }
   log('insert failed; attempt trail:', JSON.stringify(result.tried))
+}
+
+/**
+ * @param {Document} doc - Owning document.
+ * @returns {Element | null} The last picker chip in the composer.
+ */
+function lastPickerChip(doc) {
+  const chips = doc.querySelectorAll(`[data-composer-chip="${CHIP_SOURCE}"]`)
+  return chips.length === 0 ? null : chips[chips.length - 1]
+}
+
+/**
+ * Remove the chip a × was clicked on.
+ *
+ * @param {Element} chip - The chip to drop.
+ * @returns {void}
+ */
+function removePickedChip(chip) {
+  const doc = chip.ownerDocument
+  const win = doc.defaultView ?? window
+  const path = removeChipElement({
+    doc,
+    win,
+    chip,
+    facade: resolveFacade(PICKER_STATE.ctx, PICKER_STATE.sessionId, (message) => log(message)),
+    blockText: rememberedBlock(chip),
+    onEvent: (message) => log(message),
+  })
+  log(path === null ? 'the chip was not removed' : `removed a chip via "${path}"`)
+  decorateChips({ doc, onRemove: removePickedChip })
 }
 
 /**
@@ -275,7 +327,10 @@ function applyPicker(ctx) {
     ),
   )
 
+  const stopWatchingChips = watchChips({ doc, win, onRemove: removePickedChip })
+
   ctx.effect(() => () => {
+    stopWatchingChips()
     picker.dispose()
     PICKER_STATE.picker = null
     PICKER_STATE.listeners.clear()

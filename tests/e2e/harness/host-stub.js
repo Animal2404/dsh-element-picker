@@ -132,7 +132,7 @@
       // A chip-capable host: the picker prefers inserting a reference chip, and
       // that path needs a session scope plus an input facade. Stubbed here so
       // the decision itself is covered without a real DSH.
-      var chips = { registered: null, inserted: [], name: null }
+      var chips = { registered: null, inserted: [], name: null, projection: '' }
       window.__harness.chips = chips
 
       // Application-side listeners: if the picker leaks a click, these fire.
@@ -154,7 +154,14 @@
       if (mode === 'chip') {
         extra.sessions = { scope: function (id) { return { id: id } } }
         extra.conversation = { input: { for: function () { return {
-          state: { getSnapshot: function () { return { draftRev: 42, draft: composerInput().textContent } } },
+          // Like the real shell: the draft is a clipboard projection in which a
+          // chip appears as its clipboard text.
+          state: { getSnapshot: function () { return { draftRev: 42, draft: chips.projection + composerInput().textContent } } },
+          setDraft: function (text) {
+            chips.projection = ''
+            composerInput().textContent = text
+            return true
+          },
           caretSpan: function () { var text = composerInput().textContent; return { start: text.length, end: text.length } },
           insertReference: function (ref, span) {
             chips.inserted.push({ ref: ref, span: span })
@@ -163,6 +170,7 @@
             chip.setAttribute('contenteditable', 'false')
             chip.textContent = ref.label
             composerInput().appendChild(chip)
+            chips.projection += ref.clipboardText + ' '
             return true
           }
         } } } }

@@ -8,8 +8,43 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createDocument } from './helpers/dom-stub.mjs'
-import { CHIP_SOURCE, chipLabel, insertElementChip, registerChipSource } from '../src/chip.js'
+import { createDocument, createEvent, createWindow } from './helpers/dom-stub.mjs'
+import {
+  CHIP_REMOVE_MARKER,
+  CHIP_SOURCE,
+  chipLabel,
+  decorateChips,
+  insertElementChip,
+  registerChipSource,
+  removeChipElement,
+} from '../src/chip.js'
+
+/** The single-line block a chip carries. */
+const BLOCK = '[元素] button "发送" ｜ [选择器] button.x ｜ [源码] …/InputBar.tsx'
+
+/**
+ * Build a document with an editable holding one picker chip.
+ *
+ * @returns {{ doc: object, win: object, input: object, chip: object }} Fixture.
+ */
+function chipFixture() {
+  const doc = createDocument()
+  const win = createWindow(doc)
+  win.KeyboardEvent = class StubKeyboardEvent {
+    constructor(type, init = {}) {
+      this.type = type
+      Object.assign(this, init)
+    }
+  }
+  const input = doc.createElement('div')
+  input.setAttribute('data-composer-input', '')
+  input.setAttribute('contenteditable', 'true')
+  const chip = doc.createElement('span')
+  chip.setAttribute('data-composer-chip', CHIP_SOURCE)
+  input.appendChild(chip)
+  doc.body.appendChild(input)
+  return { doc, win, input, chip }
+}
 
 /**
  * Build a context stub with a working session, facade, and trigger registry.
@@ -142,4 +177,66 @@ test('the chip label names the tag and clips long text', () => {
 
   const empty = doc.createElement('section')
   assert.equal(chipLabel(empty), '元素 section')
+})
+
+test('a chip gains an × that swallows the editor event', () => {
+  const { doc, chip } = chipFixture()
+  const removed = []
+
+  assert.equal(decorateChips({ doc, onRemove: (element) => removed.push(element) }), 1)
+  const button = chip.querySelector(`[${CHIP_REMOVE_MARKER}]`)
+  assert.equal(button.textContent, '×')
+  assert.equal(button.getAttribute('contenteditable'), 'false')
+  assert.equal(button.getAttribute('aria-label'), '移除该元素')
+  assert.equal(decorateChips({ doc, onRemove: () => {} }), 0, 'decoration must be idempotent')
+
+  const event = createEvent('click')
+  button.dispatchEvent(event)
+  assert.deepEqual(removed, [chip], 'the × reports the chip it belongs to')
+  assert.equal(event.prevented, true, 'the editor must not also act on the click')
+  assert.equal(event.stopped, true)
+})
+
+test('removal uses the editor gesture when the editor honours it', () => {
+  const { doc, win, input, chip } = chipFixture()
+  input.addEventListener('keydown', (event) => {
+    assert.equal(event.key, 'Backspace')
+    chip.remove()
+  })
+
+  assert.equal(removeChipElement({ doc, win, chip }), 'backspace')
+})
+
+test('removal falls back to the facade when the editor ignores the gesture', () => {
+  const { doc, win, chip } = chipFixture()
+  const drafts = []
+  const facade = {
+    state: { getSnapshot: () => ({ draft: `draft text ${BLOCK}` }) },
+    setDraft: (text) => {
+      drafts.push(text)
+      chip.remove()
+    },
+  }
+
+  assert.equal(removeChipElement({ doc, win, chip, facade, blockText: BLOCK }), 'setDraft')
+  assert.deepEqual(drafts, ['draft text '], 'only the chip line is dropped')
+})
+
+test('removal reports failure instead of pretending', () => {
+  const { doc, win, chip } = chipFixture()
+  const events = []
+
+  assert.equal(removeChipElement({ doc, win, chip, onEvent: (message) => events.push(message) }), null)
+  assert.match(events.join(' '), /ignored a synthetic Backspace/)
+  assert.match(events.join(' '), /could not be removed/)
+})
+
+test('removal is a no-op when no picker chip is present', () => {
+  const doc = createDocument()
+  const win = createWindow(doc)
+  const orphan = doc.createElement('span')
+  const events = []
+
+  assert.equal(removeChipElement({ doc, win, chip: orphan, onEvent: (m) => events.push(m) }), null)
+  assert.match(events.join(' '), /no picker chip is present/)
 })

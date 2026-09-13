@@ -53,6 +53,28 @@ export const PICKER_CSS = `
   pointer-events: none;
 }
 
+/* The remove affordance on a picker chip (ZCode's picked-element pill has one). */
+[data-dsh-picker-remove] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 3px;
+  border-radius: 4px;
+  color: #9aa1ac;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+}
+
+[data-dsh-picker-remove]:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
 [data-dsh-picker-active="true"] [data-dsh-picker-ui="hint"] {
   display: block;
 }

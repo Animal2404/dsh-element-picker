@@ -126,8 +126,10 @@ function overlayState(page) {
       slotButtons: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
       chips: [...document.querySelectorAll('[data-composer-chip]')].map((chip) => ({
         source: chip.getAttribute('data-composer-chip'),
-        label: (chip.textContent ?? '').trim(),
+        // The label excludes the injected remove affordance.
+        label: (chip.textContent ?? '').replace('×', '').trim(),
       })),
+      removeButtons: document.querySelectorAll('[data-dsh-picker-remove]').length,
       draft: document.querySelector('[data-composer-input]').textContent,
     }
   })
@@ -287,6 +289,23 @@ async function runScenario(browser, mode, origin) {
       afterInsert.chipCodec === 'element-picker',
       String(afterInsert.chipCodec),
     )
+    check(
+      'the chip carries a remove affordance',
+      inserted.removeButtons === 1,
+      String(inserted.removeButtons),
+    )
+
+    // The × drops that chip, like ZCode's picked-element pill.
+    await page.click('[data-dsh-picker-remove]')
+    await page.waitForTimeout(300)
+    const afterRemove = await overlayState(page)
+    check('the × removed the chip', afterRemove.chips.length === 0, JSON.stringify(afterRemove.chips))
+    check(
+      'the remove affordance went with the chip',
+      afterRemove.removeButtons === 0,
+      String(afterRemove.removeButtons),
+    )
+    await shot('04b-chip-removed')
   } else if (mode === 'paste') {
     check('the shell paste path was chosen', afterInsert.calls.paste === 1, JSON.stringify(afterInsert.calls))
     check('setDraft was never used', afterInsert.calls.setDraft === 0, JSON.stringify(afterInsert.calls))
