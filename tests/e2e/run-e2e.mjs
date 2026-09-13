@@ -395,8 +395,9 @@ async function runScenario(browser, mode, origin) {
     active.hintRing?.duration === '0.9s' &&
       active.hintText.includes('点元素插入定位信息') &&
       active.hintText.includes('Esc 结束') &&
-      active.hintText.includes('Shift') === false &&
-      active.hintText.includes('Ctrl+Shift+G') === false,
+      active.hintText.includes('Shift+点击') === false &&
+      active.hintText.includes('Ctrl+Shift+G') === false &&
+      active.hintText.includes('合并为元素组') === false,
     JSON.stringify({ ring: active.hintRing?.duration, text: active.hintText }),
   )
   check('the hint bar is visible in selection mode', active.hintVisible === true)
