@@ -418,7 +418,7 @@ await step('picking an element in the real UI', async () => {
   const themed = await page.evaluate(() => {
     const card = document.querySelector('[data-dsh-picker-ui="info"]')
     const probe = document.createElement('div')
-    probe.style.background = 'var(--dsw-alias-bg-overlay)'
+    probe.style.background = 'var(--dsw-alias-bg-layer-2)'
     document.body.appendChild(probe)
     const tokenBackground = getComputedStyle(probe).backgroundColor
     const labelToken = getComputedStyle(document.body).getPropertyValue('--dsw-alias-label-primary').trim()
