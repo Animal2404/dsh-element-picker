@@ -14,13 +14,15 @@ different job (a browser extension), not this one.
 1. One control, in the composer tool row (`conversation.input.left`): a pointer
    icon that lights up while selection mode is on. The overlay owns no button of
    its own — an earlier floating button duplicated the control and sat on top of
-   the composer's send button.
+   the composer's send button. While selecting, the chips' `×` is dimmed: clicks
+   belong to the picker until the selection ends.
 2. Click it: selection mode turns on, the hint bar appears, and hovering
    outlines the element that will be picked.
-3. Click an element: it becomes a chip in the composer (or the compact text
-   line where chips are unavailable), and selection mode exits.
-4. Click the button again, or press Escape: selection mode exits without
-   picking.
+3. Click an element: it becomes a chip in the composer (or the compact text line
+   where chips are unavailable). **Selection mode stays on**, so elements can be
+   picked one after another.
+4. Click the button again, or press Escape: the selection ends. That is the only
+   way out — a pick never ends it.
 5. `Ctrl+Shift+E` toggles selection mode from the keyboard. That is how you pick
    inside a menu: open the menu first, toggle with the shortcut, then click the
    item — entering selection mode by click would dismiss the menu, and clicking
