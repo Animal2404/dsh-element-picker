@@ -234,16 +234,18 @@ export function chipSpan(occurrences, index, draftRev) {
  * from the chip's own box, and the event is swallowed so the editor never moves
  * its caret.
  *
+ * This works while selection mode is on as well: people reach for the × right
+ * after picking, and the picker treats its own chips as its own nodes, so a
+ * click here is neither swallowed by the overlay nor turned into a pick.
+ *
  * @param {object} options - Watch request.
  * @param {Document} options.doc - Owning document.
  * @param {Window} options.win - Owning window.
  * @param {(chip: Element) => void} options.onRemove - Invoked for a chip click.
- * @param {() => boolean} [options.isPickerActive] - Skip while selecting.
  * @returns {() => void} Teardown.
  */
-export function watchChipRemoval({ doc, win, onRemove, isPickerActive }) {
+export function watchChipRemoval({ doc, win, onRemove }) {
   const handle = (event) => {
-    if (typeof isPickerActive === 'function' && isPickerActive()) return
     const target = event.target
     if (target === null || typeof target.closest !== 'function') return
     const chip = target.closest(CHIP_SELECTOR)

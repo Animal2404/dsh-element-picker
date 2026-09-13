@@ -489,6 +489,42 @@ async function runScenario(browser, mode, origin) {
     )
     check('the mode is still on after the second pick', afterSecondPick.active === 'true', String(afterSecondPick.active))
 
+    // The outer delete has to work right here: the user has just picked, so
+    // selection mode is still on when they reach for the ×.
+    let activeChipBox = await page.locator('[data-composer-chip="element-picker"]').first().boundingBox()
+    await page.mouse.click(activeChipBox.x + activeChipBox.width - 4, activeChipBox.y + activeChipBox.height / 2)
+    await page.waitForTimeout(400)
+    const afterActiveClear = await overlayState(page)
+    check(
+      'the × clears every pick while selection mode is still on',
+      afterActiveClear.chips.length === 0,
+      JSON.stringify(afterActiveClear.chips),
+    )
+    check(
+      'clearing the picks leaves selection mode alone',
+      afterActiveClear.active === 'true',
+      String(afterActiveClear.active),
+    )
+    check(
+      'clicking the chip did not pick the chip as an element',
+      afterActiveClear.draft.includes('[元素]') === false,
+      JSON.stringify(afterActiveClear.draft.slice(0, 80)),
+    )
+
+    // Pick the same two elements again for the hover-list part of the run.
+    for (let round = 0; round < 2; round += 1) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.waitForTimeout(150)
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+      await page.waitForTimeout(500)
+    }
+    const regrouped = await overlayState(page)
+    check(
+      'picking again re-builds the group chip',
+      /^2 个元素$/.test(regrouped.chips[0]?.label ?? ''),
+      JSON.stringify(regrouped.chips),
+    )
+
     // Hovering the group chip lists what it holds, and the list scrolls.
     await page.hover('[data-composer-chip="element-picker"]')
     await page.waitForTimeout(400)

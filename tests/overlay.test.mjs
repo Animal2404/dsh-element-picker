@@ -120,6 +120,28 @@ test('a click picks the element, swallows the event, and stays in selection mode
   assert.equal(picker.isActive(), false)
 })
 
+test('a picker chip is the picker\'s own node, so it is never picked or swallowed', () => {
+  const { doc, win } = fixture()
+  const input = doc.createElement('div')
+  input.setAttribute('data-composer-input', '')
+  doc.body.appendChild(input)
+  const chip = doc.createElement('span')
+  chip.setAttribute('data-composer-chip', 'element-picker')
+  input.appendChild(chip)
+
+  const picks = []
+  const picker = createPicker({ doc, win, onPick: (element) => picks.push(element) })
+  picker.setActive(true)
+
+  const event = createEvent('click', { target: chip, clientX: 5, clientY: 5 })
+  fire(win, 'click', event)
+
+  assert.deepEqual(picks, [], 'a chip is not an element to locate')
+  assert.equal(event.prevented, false, 'the chip keeps its own click handling (the ×)')
+  assert.equal(event.stopped, false)
+  picker.setActive(false)
+})
+
 test('a swallowed pointerdown never reaches the application', () => {
   const { doc, win, target } = fixture()
   const picker = createPicker({ doc, win, onPick: () => {} })

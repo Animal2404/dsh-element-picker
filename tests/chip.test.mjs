@@ -258,15 +258,17 @@ test('a click elsewhere on the chip belongs to the editor', () => {
   stop()
 })
 
-test('the remove zone stays out of the way while selecting', () => {
+test('the remove zone works while selection mode is on', () => {
+  // People reach for the × right after picking, so this must not be gated on
+  // selection mode: the overlay leaves clicks on its own chips alone instead.
   const { doc, win, chips } = fixture(1)
   const chip = chips[0]
   chip.getBoundingClientRect = () => ({ left: 100, top: 50, right: 200, bottom: 70, width: 100, height: 20 })
   const removed = []
-  const stop = watchChipRemoval({ doc, win, onRemove: (element) => removed.push(element), isPickerActive: () => true })
+  const stop = watchChipRemoval({ doc, win, onRemove: (element) => removed.push(element) })
 
   fire(win, 'mousedown', createEvent('mousedown', { target: chip, clientX: 195, clientY: 60 }))
-  assert.deepEqual(removed, [], 'a pick must never delete a chip')
+  assert.deepEqual(removed, [chip])
   stop()
 })
 

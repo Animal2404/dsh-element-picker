@@ -584,7 +584,6 @@ function applyPicker(ctx) {
     doc,
     win,
     onRemove: removePickedChip,
-    isPickerActive: () => picker.isActive(),
   })
 
   ctx.effect(() => () => {

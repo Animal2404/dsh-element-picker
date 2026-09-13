@@ -123,6 +123,11 @@ Both go through the same span-addressed removal as everything else, so a user's
 `@file` chips in the same draft are untouched. Dropping the last row simply
 removes the chip.
 
+The picker treats its own chips as its own nodes, which is what makes the ×
+usable at the moment people actually reach for it: selection mode is still on
+right after a pick, and a click there is neither swallowed by the overlay nor
+turned into a pick of the chip itself.
+
 The compact line (also what the fallback inserts):
 
 ```

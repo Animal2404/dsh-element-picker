@@ -25,6 +25,7 @@
  * Plain DOM (no framework): the plugin's React entry only calls `toggle()`.
  */
 
+import { CHIP_SELECTOR } from './chip.js'
 import { hoverFacts } from './describe.js'
 
 /** Marker attribute on every node this overlay owns. */
@@ -62,6 +63,10 @@ const SWALLOWED_EVENTS = [
 function isOwnNode(node, doc) {
   if (node === null || node.nodeType !== 1) return false
   if (typeof node.closest !== 'function') return false
+  // The chips this plugin inserted count as ours too: a pick must never land on
+  // one, and — because selection mode is usually still on right after picking —
+  // their own controls (the × that clears the pile) have to stay clickable.
+  if (node.closest(CHIP_SELECTOR) !== null) return true
   return node.closest(`[${PICKER_MARKER}]`) !== null
 }
 
