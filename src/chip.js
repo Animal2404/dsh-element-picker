@@ -207,8 +207,23 @@ export function isModelLead(text) {
  */
 export function modelFormOf(ref) {
   if (typeof ref !== 'string') return String(ref ?? '')
-  const count = (ref.split(GROUP_ITEM_RE).length - 1) || 1
-  return `${MODEL_LEAD_PREFIX}${count}${MODEL_LEAD_TAIL}${LF}${ref}`
+  return `${MODEL_LEAD_PREFIX}${blockCountOf(ref)}${MODEL_LEAD_TAIL}${LF}${ref}`
+}
+
+/**
+ * How many elements a block carries.
+ *
+ * A group payload states its own count in the header; anything else is one
+ * element, or as many as it has numbered blocks.
+ *
+ * @param {string} ref - Chip reference (our block).
+ * @returns {number} The element count.
+ */
+function blockCountOf(ref) {
+  const header = /\[元素组\]\s*(\d+)\s*个界面元素/.exec(ref)
+  if (header !== null) return Number(header[1])
+  const numbered = ref.split(GROUP_ITEM_RE).length - 1
+  return numbered > 1 ? numbered : 1
 }
 
 /**

@@ -477,7 +477,9 @@ test('the model form leads with a sentence, so the title is not an element name'
   assert.equal(single.endsWith(BLOCK), true)
 
   // A group counts its elements, so the lead reads correctly for both.
-  const group = modelFormOf('[元素组] 3 个界面元素' + String.fromCharCode(10) + '（1）[元素] a')
+  const group = modelFormOf(
+    ['[元素组] 3 个界面元素', '（1）[元素] a', '（2）[元素] b', '（3）[元素] c'].join(String.fromCharCode(10)),
+  )
   assert.equal(group.startsWith('我选取了 3 个界面元素，以下是定位信息：'), true, group)
 
   // The lead is the fold's, not the block's: it is recognised on its own.
