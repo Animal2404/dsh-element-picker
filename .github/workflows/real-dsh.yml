@@ -1,0 +1,83 @@
+name: real-dsh
+
+# Boots the real @deepseek-ai/dsh build on the runner, installs this plugin into
+# a throwaway profile, and drives the actual Web UI. This is the only check that
+# can see the real Lexical composer and the real slot host; everything else in
+# this repository runs against a harness that only reproduces their contract.
+#
+# Diagnostics-first: the probe reports what it cannot reach (a session-scoped
+# entry with no session, say) instead of failing on it, and uploads the DOM dump,
+# server log, plugin console, and screenshots either way. It fails only for
+# things that are unambiguously broken.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      dsh-version:
+        description: '@deepseek-ai/dsh version to test against'
+        required: false
+        default: 0.1.5-rc.2
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-dsh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: real DSH boot, plugin mount, pick and insert
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm (the plugin installer forwards to it)
+        run: npm install --global pnpm
+
+      # The version under test is the one the user actually runs.
+      - name: Install the harness dependencies and the DSH build under test
+        run: |
+          set -euo pipefail
+          npm install --no-package-lock --no-audit --no-fund
+          npm install --no-save --no-package-lock --no-audit --no-fund \
+            "@deepseek-ai/dsh@${{ github.event.inputs.dsh-version || '0.1.5-rc.2' }}"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the client bundle
+        run: npm run build
+
+      - name: Boot real DSH, install the plugin, drive the UI
+        run: node scripts/real-dsh-probe.mjs
+        continue-on-error: true
+        id: probe
+
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-dsh-evidence
+          path: real-dsh-out/
+          if-no-files-found: warn
+
+      - name: Report the probe verdict
+        run: |
+          set -euo pipefail
+          if [ -f real-dsh-out/summary.txt ]; then
+            tail -25 real-dsh-out/summary.txt
+          fi
+          if [ "${{ steps.probe.outcome }}" != "success" ]; then
+            echo "::error::real-DSH probe reported failures"
+            exit 1
+          fi
