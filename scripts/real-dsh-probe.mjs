@@ -378,7 +378,7 @@ if (state.pickerSlotButton === 1) {
   })
   must('the control renders inside the session header', placement !== null && placement.inHeader === true, JSON.stringify(placement))
   must(
-    'the control sits in the header's right-hand cluster',
+    'the control sits in the right-hand header cluster',
     placement !== null && placement.x > placement.viewport * 0.7,
     JSON.stringify(placement),
   )
