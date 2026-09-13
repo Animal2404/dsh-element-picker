@@ -560,16 +560,28 @@ await step('picking inside a menu that dismisses itself on pointerdown', async (
     return
   }
 
+  // The chip names the element under the pointer, which inside a menu item is a
+  // leaf span, not the item's own label text — so the expectation is computed
+  // from the hit stack rather than from the item's caption.
+  const expected = await page.evaluate(
+    ({ x, y }) => {
+      const stack = document.elementsFromPoint(x, y).filter((node) => node.closest('[data-dsh-picker-ui]') === null)
+      const element = stack[0]
+      return element === undefined ? null : (element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 12)
+    },
+    { x: item.x, y: item.y },
+  )
+
   await page.mouse.click(item.x, item.y)
   await page.waitForTimeout(900)
   const chips = await page.evaluate(() =>
     [...document.querySelectorAll('[data-composer-chip]')].map((chip) => (chip.textContent ?? '').trim()),
   )
-  const hit = chips.some((label) => label.includes(item.text.slice(0, 5)))
+  const hit = expected !== null && expected !== '' && chips.some((label) => label.includes(expected))
   must(
     'the menu item was picked into a chip',
     hit,
-    JSON.stringify({ item: item.text, chips }),
+    JSON.stringify({ expected, item: item.text, chips }),
   )
   await page.screenshot({ path: join(out, '09-menu-pick.png') })
 })
