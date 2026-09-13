@@ -133,10 +133,17 @@ function PickerButton(props) {
       queued = false
       const anchor = anchorRef.current
       if (anchor === null) return
+      // Only a box with real size can anchor anything: an empty slot host or a
+      // row with no entries measures 0 and would place the control at a guess.
       let target = null
       for (const selector of POSITION_SELECTORS) {
-        target = anchor.ownerDocument.querySelector(selector)
-        if (target !== null) break
+        const candidate = anchor.ownerDocument.querySelector(selector)
+        if (candidate === null) continue
+        const box = candidate.getBoundingClientRect()
+        if (box.width > 0 && box.height > 0) {
+          target = candidate
+          break
+        }
       }
       if (target === null) {
         setOffset({ dx: 0, dy: 0 })
