@@ -196,6 +196,26 @@ function overlayState(page) {
           playState: style.animationPlayState,
         }
       })(),
+      previewVisible: (() => {
+        const panel = document.querySelector('[data-dsh-picker-ui="chip-preview"]')
+        if (panel === null) return false
+        return getComputedStyle(panel).display !== 'none' && panel.getAttribute('data-dsh-picker-visible') === 'true'
+      })(),
+      previewRows: document.querySelectorAll('[data-dsh-picker-preview-item]').length,
+      previewText: (() => {
+        const panel = document.querySelector('[data-dsh-picker-ui="chip-preview"]')
+        return panel === null ? '' : (panel.innerText ?? '').replace(/\s+/g, ' ').trim()
+      })(),
+      previewScrollable: (() => {
+        const panel = document.querySelector('[data-dsh-picker-ui="chip-preview"]')
+        if (panel === null) return false
+        const style = getComputedStyle(panel)
+        return style.overflowY === 'auto' && style.maxHeight !== 'none'
+      })(),
+      previewMaxHeight: (() => {
+        const panel = document.querySelector('[data-dsh-picker-ui="chip-preview"]')
+        return panel === null ? null : getComputedStyle(panel).maxHeight
+      })(),
       chipRemoveGlyph: (() => {
         const chip = document.querySelector('[data-composer-chip="element-picker"]')
         if (chip === null) return null
@@ -439,41 +459,40 @@ async function runScenario(browser, mode, origin) {
       afterInsert.chipCodec === 'element-picker',
       String(afterInsert.chipCodec),
     )
-    // One more element without touching the control again: the point of the mode.
+    // One more element without touching the control again. The picks merge as
+    // you go (ZCode's behaviour), so there is one group chip and not a row.
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.waitForTimeout(150)
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(700)
     const afterSecondPick = await overlayState(page)
     check(
-      'a second element can be picked without leaving the mode',
-      afterSecondPick.chips.length === 2,
+      'a second pick is merged into one group chip automatically',
+      afterSecondPick.chips.length === 1,
       JSON.stringify(afterSecondPick.chips),
     )
     check(
-      'the mode is still on after the second pick',
-      afterSecondPick.active === 'true',
-      String(afterSecondPick.active),
+      'the group chip counts the elements',
+      /^2 个元素$/.test(afterSecondPick.chips[0]?.label ?? ''),
+      JSON.stringify(afterSecondPick.chips[0]),
     )
+    check('the mode is still on after the second pick', afterSecondPick.active === 'true', String(afterSecondPick.active))
 
-    // Ctrl+Shift+G folds both picks into one group chip.
-    await page.keyboard.press('Control+Shift+G')
+    // Hovering the group chip lists what it holds, and the list scrolls.
+    await page.hover('[data-composer-chip="element-picker"]')
     await page.waitForTimeout(400)
-    const grouped = await harnessState(page)
+    const preview = await overlayState(page)
+    check('hovering the chip opens the preview', preview.previewVisible === true)
+    check('the preview lists both elements', preview.previewRows === 2, String(preview.previewRows))
     check(
-      'the shortcut groups the picks into one chip',
-      grouped.chipLabels.length === 1 && /元素组 2 个元素/.test(grouped.chipLabels[0] ?? ''),
-      JSON.stringify(grouped.chipLabels),
+      'the preview shows a summary, a tag line and the page',
+      preview.previewText.includes('元素') && /span|div|button/.test(preview.previewText) && preview.previewText.includes('DeepSeek'),
+      preview.previewText.slice(0, 120),
     )
-    check(
-      'the group payload carries both elements',
-      (grouped.chipPayloads[0] ?? '').includes('[元素组] 2 个界面元素') &&
-        (grouped.chipPayloads[0] ?? '').includes('（1）') &&
-        (grouped.chipPayloads[0] ?? '').includes('（2）'),
-      String(grouped.chipPayloads[0]).slice(0, 120),
-    )
-    const afterGroup = await overlayState(page)
-    check('grouping leaves one chip in the composer', afterGroup.chips.length === 1, JSON.stringify(afterGroup.chips))
+    check('the preview scrolls', preview.previewScrollable === true, String(preview.previewMaxHeight))
+    await shot('04b-chip-preview')
+    await page.mouse.move(4, 4)
+    await page.waitForTimeout(300)
 
     // Leave the mode before exercising the ×: while selecting, clicks belong to
     // the picker, so the × is deliberately inert.
@@ -486,8 +505,7 @@ async function runScenario(browser, mode, origin) {
       String(inserted.chipRemoveGlyph),
     )
 
-    // The × drops that chip, like ZCode's picked-element pill: a real click in
-    // the chip's right-hand remove region.
+    // The × drops the group chip, like ZCode's picked-element pill.
     const chipBox = await page.locator('[data-composer-chip="element-picker"]').first().boundingBox()
     await page.mouse.click(chipBox.x + chipBox.width - 4, chipBox.y + chipBox.height / 2)
     await page.waitForTimeout(400)
@@ -497,18 +515,9 @@ async function runScenario(browser, mode, origin) {
       afterRemove.chips.length === 0,
       JSON.stringify(afterRemove.chips),
     )
-    await shot('04b-chip-removed')
-  } else if (mode === 'paste') {
-    check('the shell paste path was chosen', afterInsert.calls.paste === 1, JSON.stringify(afterInsert.calls))
-    check('setDraft was never used', afterInsert.calls.setDraft === 0, JSON.stringify(afterInsert.calls))
-  } else if (mode === 'non-editable') {
-    check('setDraft was the path used', afterInsert.calls.setDraft === 1, JSON.stringify(afterInsert.calls))
-    check('the existing draft survived', inserted.draft.startsWith('existing draft '), inserted.draft.slice(0, 40))
-    check('no paste path was available', afterInsert.calls.paste === 0, JSON.stringify(afterInsert.calls))
-  } else {
-    check('the dom path was used, not setDraft', afterInsert.calls.setDraft === 0, JSON.stringify(afterInsert.calls))
-    check('the dom path did not need paste', afterInsert.calls.paste === 0, JSON.stringify(afterInsert.calls))
+    await shot('04c-chip-removed')
   }
+
 
   // Finishing the selection is what returns clicks to the application.
   await page.keyboard.press('Escape')

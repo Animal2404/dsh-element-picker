@@ -424,7 +424,7 @@ export function groupElementChips({ ctx, sessionId, onEvent }) {
     ctx,
     sessionId,
     text: payload,
-    label: `${GROUP_LABEL_PREFIX} ${total} 个元素`,
+    label: `${total} 个元素`,
     onEvent: note,
   })
   if (inserted === null) {
@@ -433,4 +433,159 @@ export function groupElementChips({ ctx, sessionId, onEvent }) {
   }
   note(`grouped ${total} chips into one carrying a ${payload.split(String.fromCharCode(10)).filter((line) => line !== '').length}-line block`)
   return { grouped: total }
+}
+
+/** One row of the chip preview: what the user picked, in their words. */
+const PREVIEW_SUMMARY_RE = /^\[元素\]\s*/
+
+/**
+ * Parse the block a chip stands for into preview rows.
+ *
+ * The payload is this plugin's own format, so it can be read back without any
+ * extra state: a group lists its elements as `（1）…（2）…`, and a single pick is
+ * just the block. Each row takes the element summary, its tag and role when the
+ * block carries one, and the page it came from.
+ *
+ * @param {string} text - The chip's payload.
+ * @param {string} [origin] - Page title to show on every row.
+ * @returns {{ summary: string, meta: string, origin: string }[]} Preview rows.
+ */
+export function parsePreviewItems(text, origin = '') {
+  const blocks = String(text ?? '')
+    .split(/（\d+）/)
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+
+  const rows = []
+  for (const block of blocks) {
+    const lines = block.split(String.fromCharCode(10)).map((line) => line.trim())
+    const headline = lines.find((line) => PREVIEW_SUMMARY_RE.test(line))
+    if (headline === undefined) continue
+
+    const summary = headline.replace(PREVIEW_SUMMARY_RE, '').trim()
+    const tag = summary.split(/[\s.:#]/)[0] || 'element'
+    const attributes = lines.find((line) => line.startsWith('[属性]')) ?? ''
+    const role = /role="([^"]+)"/.exec(attributes)
+    const meta = role === null ? tag : `${tag} · role=${role[1]}`
+    rows.push({ summary, meta, origin })
+  }
+  return rows
+}
+
+/** Delay before a preview hides, so the pointer can travel into it. */
+const PREVIEW_HIDE_DELAY_MS = 160
+
+/**
+ * Show a preview of what a picker chip holds when the pointer rests on it.
+ *
+ * ZCode's picked-element pill does the same: hovering it lists the elements, and
+ * the list scrolls when there are many. The panel is ours, marked so the picker
+ * ignores it, and it takes pointer events so it can actually be scrolled.
+ *
+ * @param {object} options - Watch request.
+ * @param {Document} options.doc - Owning document.
+ * @param {Window} options.win - Owning window.
+ * @param {() => string} options.payloadOf - Reads the payload of one chip.
+ * @returns {() => void} Teardown.
+ */
+export function watchChipPreview({ doc, win, payloadOf }) {
+  const host = doc.body ?? doc.documentElement
+  let panel = null
+  let hideTimer = null
+  let currentChip = null
+
+  const build = () => {
+    const element = doc.createElement('div')
+    element.setAttribute('data-dsh-picker-ui', 'chip-preview')
+    element.setAttribute('data-dsh-picker-visible', 'false')
+    element.setAttribute('role', 'tooltip')
+    host.appendChild(element)
+    return element
+  }
+
+  const show = (chip) => {
+    const rows = parsePreviewItems(payloadOf(chip) ?? '', doc.title ?? '')
+    if (rows.length === 0) return
+    if (panel === null) panel = build()
+
+    panel.textContent = ''
+    for (const row of rows) {
+      const item = doc.createElement('div')
+      item.setAttribute('data-dsh-picker-preview-item', 'true')
+
+      const summary = doc.createElement('div')
+      summary.setAttribute('data-dsh-picker-preview-summary', 'true')
+      summary.textContent = row.summary
+
+      const meta = doc.createElement('div')
+      meta.setAttribute('data-dsh-picker-preview-meta', 'true')
+      meta.textContent = row.meta
+
+      const origin = doc.createElement('div')
+      origin.setAttribute('data-dsh-picker-preview-origin', 'true')
+      origin.textContent = row.origin
+
+      item.appendChild(summary)
+      item.appendChild(meta)
+      if (row.origin !== '') item.appendChild(origin)
+      panel.appendChild(item)
+    }
+
+    const box = chip.getBoundingClientRect()
+    const above = box.top > (win.innerHeight ?? 0) / 2
+    panel.setAttribute('data-dsh-picker-visible', 'true')
+    const height = panel.getBoundingClientRect().height
+    panel.style.left = `${Math.max(8, Math.round(box.left))}px`
+    panel.style.top = `${Math.round(above ? Math.max(8, box.top - 8 - height) : box.bottom + 8)}px`
+    currentChip = chip
+  }
+
+  const scheduleHide = () => {
+    if (hideTimer !== null) win.clearTimeout(hideTimer)
+    hideTimer = win.setTimeout(() => {
+      if (panel !== null) panel.setAttribute('data-dsh-picker-visible', 'false')
+      currentChip = null
+    }, PREVIEW_HIDE_DELAY_MS)
+  }
+
+  const owns = (node) => {
+    if (node === null || typeof node.closest !== 'function') return false
+    return node.closest(CHIP_SELECTOR) !== null || node.closest('[data-dsh-picker-ui="chip-preview"]') !== null
+  }
+
+  const onOver = (event) => {
+    const node = event.target
+    if (node === null || typeof node.closest !== 'function') return
+    const chip = node.closest(CHIP_SELECTOR)
+    if (chip !== null) {
+      if (hideTimer !== null) win.clearTimeout(hideTimer)
+      if (chip !== currentChip) show(chip)
+      return
+    }
+    if (node.closest('[data-dsh-picker-ui="chip-preview"]') === null) scheduleHide()
+  }
+
+  const onOut = (event) => {
+    if (!owns(event.target)) return
+    scheduleHide()
+  }
+
+  const hide = () => {
+    if (hideTimer !== null) win.clearTimeout(hideTimer)
+    if (panel !== null) panel.setAttribute('data-dsh-picker-visible', 'false')
+    currentChip = null
+  }
+
+  const target = typeof win.addEventListener === 'function' ? win : doc
+  target.addEventListener('pointerover', onOver, true)
+  target.addEventListener('pointerout', onOut, true)
+  return {
+    hide,
+    dispose: () => {
+      target.removeEventListener('pointerover', onOver, true)
+      target.removeEventListener('pointerout', onOut, true)
+      if (hideTimer !== null) win.clearTimeout(hideTimer)
+      if (panel !== null) panel.remove()
+    },
+  }
 }

@@ -11,6 +11,7 @@ import test from 'node:test'
 import { createDocument, createEvent, createWindow } from './helpers/dom-stub.mjs'
 import {
   CHIP_SELECTOR,
+  parsePreviewItems,
   GROUP_LABEL_PREFIX,
   groupElementChips,
   CHIP_SOURCE,
@@ -420,4 +421,33 @@ test('grouping leaves the draft alone when the session is unreachable', () => {
   const events = []
   assert.equal(groupElementChips({ ctx: {}, sessionId: 's', onEvent: (m) => events.push(m) }), null)
   assert.match(events.join(' '), /no session scope/)
+})
+
+test('a group payload parses back into one preview row per element', () => {
+  const payload = [
+    '[元素组] 2 个界面元素',
+    '',
+    '（1）[元素] span "Gemini"',
+    '[选择器] span.a',
+    '[属性] role="treeitem"',
+    '（2）[元素] div "zcode"',
+    '[选择器] div.b',
+    '',
+  ].join(String.fromCharCode(10))
+
+  const rows = parsePreviewItems(payload, 'DeepSeek Harness')
+  assert.equal(rows.length, 2)
+  assert.deepEqual(rows[0], { summary: 'span "Gemini"', meta: 'span · role=treeitem', origin: 'DeepSeek Harness' })
+  assert.deepEqual(rows[1], { summary: 'div "zcode"', meta: 'div', origin: 'DeepSeek Harness' })
+})
+
+test('a single element payload is one row, and junk is none', () => {
+  const single = parsePreviewItems('[元素] button "发送"' + String.fromCharCode(10) + '[HTML] <button>')
+  assert.equal(single.length, 1)
+  assert.equal(single[0].summary, 'button "发送"')
+  assert.equal(single[0].meta, 'button')
+
+  assert.deepEqual(parsePreviewItems(''), [])
+  assert.deepEqual(parsePreviewItems('只是一段普通文字'), [])
+  assert.deepEqual(parsePreviewItems(undefined), [])
 })

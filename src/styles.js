@@ -254,6 +254,67 @@ export const PICKER_CSS = `
   transform: rotate(90deg);
 }
 
+/* Hovering a picker chip lists what it holds, like ZCode's picked-element pill.
+   It takes pointer events so the list can actually be scrolled, and scrolls with
+   DSH's own scrollbar colours. */
+[data-dsh-picker-ui="chip-preview"] {
+  position: fixed;
+  display: none;
+  z-index: 2147483001;
+  min-width: 220px;
+  max-width: 340px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, rgba(255, 255, 255, 0.2)) transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2, rgba(20, 22, 27, 0.98));
+  border: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.12));
+  box-shadow: var(--dsw-elevation-soft, 0 8px 24px rgba(0, 0, 0, 0.45));
+  color: var(--dsw-alias-label-primary, #e5e7eb);
+  font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  pointer-events: auto;
+}
+
+[data-dsh-picker-ui="chip-preview"][data-dsh-picker-visible="true"] {
+  display: block;
+}
+
+[data-dsh-picker-ui="chip-preview"]::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-dsh-picker-ui="chip-preview"]::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--dsh-scrollbar-thumb, rgba(255, 255, 255, 0.2));
+}
+
+[data-dsh-picker-preview-item] {
+  padding: 4px 0;
+}
+
+[data-dsh-picker-preview-item] + [data-dsh-picker-preview-item] {
+  border-top: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.08));
+}
+
+[data-dsh-picker-preview-summary] {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-dsh-picker-preview-meta] {
+  color: var(--dsw-alias-label-secondary, #cfd3d6);
+  font-size: 12px;
+}
+
+[data-dsh-picker-preview-origin] {
+  color: var(--dsw-alias-label-tertiary, #8b93a1);
+  font-size: 11px;
+}
+
 /* The remove affordance on a picker chip, drawn as a pseudo-element on the chip's
    own span: the span is React's portal container, so a real injected child would
    sit outside React's managed tree and could be dropped by a re-render. The

@@ -11,7 +11,7 @@
  */
 import React from 'react'
 
-import { chipLabel, groupElementChips, insertElementChip, registerChipSource, removeChipElement, resolveInputBinding, watchChipRemoval } from './chip.js'
+import { chipIndexOf, chipLabel, groupElementChips, insertElementChip, registerChipSource, removeChipElement, resolveInputBinding, watchChipPreview, watchChipRemoval } from './chip.js'
 import { buildElementBlock } from './describe.js'
 import { watchTranscript } from './transcript.js'
 import { insertBlock } from './insert.js'
@@ -385,6 +385,9 @@ function insertPickedElement(element, detailed = false) {
     if (chip !== null) {
       const lines = payload.split(String.fromCharCode(10)).filter((line) => line !== '').length
       log(`inserted a ${chip} for ${element.tagName.toLowerCase()} carrying a ${lines}-line block`)
+      // ZCode merges as you go: the picks are one group chip, not a row of them.
+      const chips = doc.querySelectorAll(`[data-composer-chip="element-picker"]`).length
+      if (chips > 1) groupPickedChips()
       return
     }
   }
@@ -414,6 +417,30 @@ function insertPickedElement(element, detailed = false) {
     return
   }
   log('insert failed; attempt trail:', JSON.stringify(result.tried))
+}
+
+/**
+ * The block a chip stands for, read back from the published occurrences.
+ *
+ * Reading it from the input state rather than from what we inserted means the
+ * preview still works after a reload, when nothing of ours is in memory.
+ *
+ * @param {Element} chip - One of our chips.
+ * @returns {string} The payload, or '' when it cannot be read.
+ */
+function chipPayload(chip) {
+  try {
+    const doc = chip.ownerDocument
+    const binding = resolveInputBinding(PICKER_STATE.ctx, resolveSessionId(PICKER_STATE.ctx, PICKER_STATE.sessionId), () => {})
+    const snapshot = typeof binding?.facade?.state?.getSnapshot === 'function' ? binding.facade.state.getSnapshot() : undefined
+    const occurrences = Array.isArray(snapshot?.occurrences) ? snapshot.occurrences : []
+    const index = chipIndexOf(doc, chip)
+    const occurrence = index >= 0 ? occurrences[index] : undefined
+    return typeof occurrence?.clipboardText === 'string' ? occurrence.clipboardText : ''
+  } catch (error) {
+    log('could not read a chip payload:', String(error))
+    return ''
+  }
 }
 
 /**
@@ -526,6 +553,8 @@ function applyPicker(ctx) {
   // untouched; this is how it renders).
   const stopWatchingTranscript = watchTranscript({ doc, win, onEvent: (message) => log(message) })
 
+  const chipPreview = watchChipPreview({ doc, win, payloadOf: (chip) => chipPayload(chip) })
+
   const stopWatchingChips = watchChipRemoval({
     doc,
     win,
@@ -535,6 +564,7 @@ function applyPicker(ctx) {
 
   ctx.effect(() => () => {
     stopWatchingTranscript()
+    chipPreview.dispose()
     stopWatchingChips()
     picker.dispose()
     PICKER_STATE.picker = null
