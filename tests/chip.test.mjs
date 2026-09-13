@@ -399,7 +399,8 @@ test('grouping removes every chip and inserts one carrying all their blocks', ()
   assert.equal(calls.inserted[0].label, `${GROUP_LABEL_PREFIX} 3 个元素`)
   assert.equal(payload.startsWith('[元素组] 3 个界面元素'), true)
   for (const block of ['[元素] a', '[元素] b', '[元素] c']) assert.equal(payload.includes(block), true)
-  assert.match(events.join(' '), /grouped 3 chips into one carrying a 5-line block/)
+  // 1 header + 3 element blocks, each on its own line.
+  assert.match(events.join(' '), /grouped 3 chips into one carrying a 4-line block/)
 })
 
 test('grouping needs at least two picks', () => {
@@ -418,5 +419,5 @@ test('grouping needs at least two picks', () => {
 test('grouping leaves the draft alone when the session is unreachable', () => {
   const events = []
   assert.equal(groupElementChips({ ctx: {}, sessionId: 's', onEvent: (m) => events.push(m) }), null)
-  assert.match(events.join(' '), /no session-bound context/)
+  assert.match(events.join(' '), /no session scope/)
 })
