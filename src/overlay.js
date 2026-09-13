@@ -15,8 +15,8 @@
  * Flow:
  *   click the tool-row button -> selection mode on, hovering outlines the
  *   element under the pointer -> click an element -> the pick is reported and
- *   selection mode exits -> click the button again (or press Escape) to leave
- *   without picking.
+ *   selection mode STAYS on, so several elements can be picked in a row ->
+ *   click the button again (or press Escape) to finish.
  *
  * While selection mode is on, the click must NOT reach the application: every
  * relevant event is swallowed in the capture phase, and the picker's own nodes
@@ -29,7 +29,7 @@
 export const PICKER_MARKER = 'data-dsh-picker-ui'
 
 /** Hint text shown while selection mode is on. */
-export const HINT_TEXT = '选择模式：点击元素插入定位信息 · Shift+点击插入完整信息 · 再点工具行按钮或 Esc 取消'
+export const HINT_TEXT = '连续选择：点元素插入定位信息 · Shift+点击插入完整信息 · 再点工具行按钮或 Esc 结束'
 
 /**
  * Keyboard toggle. Menus cannot be opened *while* selecting (their opening
@@ -218,11 +218,12 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     swallow(event)
 
     const element = targetAt(event.clientX, event.clientY)
-    setActive(false)
     if (element === null) {
       emit({ type: 'pick-missed' })
       return
     }
+    // Selection mode deliberately stays on: picking several elements in a row is
+    // the normal case, and the mode ends only on the button or Escape.
     emit({ type: 'pick' })
     onPick(element, event)
   }

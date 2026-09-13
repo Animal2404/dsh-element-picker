@@ -268,8 +268,7 @@ async function runScenario(browser, mode, origin) {
   )
   check('the block names the picked element', inserted.draft.includes('发送'), inserted.draft)
   }
-  check('selection mode left after the pick', inserted.active === 'false', String(inserted.active))
-  check('the highlight cleared after the pick', inserted.highlightVisible === false)
+  check('selection mode stays on for the next pick', inserted.active === 'true', String(inserted.active))
   check('the send button never received the swallowed click', afterInsert.calls.sends === 0, JSON.stringify(afterInsert.calls))
   check('no other application click was triggered', afterInsert.calls.sidebar === 0, JSON.stringify(afterInsert.calls))
   await shot('04-inserted')
@@ -293,6 +292,28 @@ async function runScenario(browser, mode, origin) {
       afterInsert.chipCodec === 'element-picker',
       String(afterInsert.chipCodec),
     )
+    // One more element without touching the control again: the point of the mode.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.waitForTimeout(150)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await page.waitForTimeout(500)
+    const afterSecondPick = await overlayState(page)
+    check(
+      'a second element can be picked without leaving the mode',
+      afterSecondPick.chips.length === 2,
+      JSON.stringify(afterSecondPick.chips),
+    )
+    check(
+      'the mode is still on after the second pick',
+      afterSecondPick.active === 'true',
+      String(afterSecondPick.active),
+    )
+
+    // Leave the mode before exercising the ×: while selecting, clicks belong to
+    // the picker, so the × is deliberately inert.
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(200)
+
     check(
       'the chip draws a remove glyph',
       String(inserted.chipRemoveGlyph ?? '').includes('×'),
@@ -305,7 +326,11 @@ async function runScenario(browser, mode, origin) {
     await page.mouse.click(chipBox.x + chipBox.width - 4, chipBox.y + chipBox.height / 2)
     await page.waitForTimeout(400)
     const afterRemove = await overlayState(page)
-    check('clicking the × removed the chip', afterRemove.chips.length === 0, JSON.stringify(afterRemove.chips))
+    check(
+      'clicking the × removed exactly that one chip',
+      afterRemove.chips.length === 1,
+      JSON.stringify(afterRemove.chips),
+    )
     await shot('04b-chip-removed')
   } else if (mode === 'paste') {
     check('the shell paste path was chosen', afterInsert.calls.paste === 1, JSON.stringify(afterInsert.calls))
@@ -318,6 +343,12 @@ async function runScenario(browser, mode, origin) {
     check('the dom path was used, not setDraft', afterInsert.calls.setDraft === 0, JSON.stringify(afterInsert.calls))
     check('the dom path did not need paste', afterInsert.calls.paste === 0, JSON.stringify(afterInsert.calls))
   }
+
+  // Finishing the selection is what returns clicks to the application.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  const escaped = await overlayState(page)
+  check('Escape finishes the selection', escaped.active === 'false', String(escaped.active))
 
   // With selection mode off, the application works normally again.
   await page.click('#sidebar-toggle')

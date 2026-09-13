@@ -432,6 +432,14 @@ await step('picking an element in the real UI', async () => {
     }
   })
   await page.screenshot({ path: join(out, '08-after-pick.png') })
+
+  // The mode is continuous by design; leave it before opening a menu.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(250)
+  const finished = await page.evaluate(
+    () => document.querySelector('[data-dsh-picker-ui="root"]').getAttribute('data-dsh-picker-active'),
+  )
+  must('Escape finishes the continuous selection', finished === 'false', String(finished))
 })
 
 say(`plugin console: ${pluginLog.length === 0 ? '(none)' : JSON.stringify(pluginLog, null, 2)}`)

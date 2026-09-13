@@ -73,6 +73,13 @@ export const PICKER_CSS = `
   color: #ffffff;
 }
 
+/* While selecting, clicks belong to the picker, so the × cannot act: it is shown
+   dimmed rather than looking clickable. */
+[data-dsh-picker-active="true"] [data-composer-chip="element-picker"]::after {
+  opacity: 0.35;
+  cursor: default;
+}
+
 [data-dsh-picker-active="true"] [data-dsh-picker-ui="hint"] {
   display: block;
 }

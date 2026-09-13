@@ -100,18 +100,23 @@ test('hovering highlights the resolved element in viewport coordinates', () => {
   assert.equal(target.textContent, '发送')
 })
 
-test('a click picks the element, swallows the event, and leaves selection mode', () => {
+test('a click picks the element, swallows the event, and stays in selection mode', () => {
   const { doc, win, target } = fixture()
   const picks = []
   const picker = createPicker({ doc, win, onPick: (element) => picks.push(element) })
   picker.setActive(true)
 
-  const event = createEvent('click', { target, clientX: 5, clientY: 5 })
-  fire(win, 'click', event)
+  const first = createEvent('click', { target, clientX: 5, clientY: 5 })
+  fire(win, 'click', first)
+  const second = createEvent('click', { target, clientX: 5, clientY: 5 })
+  fire(win, 'click', second)
 
-  assert.deepEqual(picks, [target])
-  assert.equal(event.prevented, true, 'the application must not receive the click')
-  assert.equal(event.stopped, true)
+  assert.deepEqual(picks, [target, target], 'several elements can be picked in a row')
+  assert.equal(first.prevented, true, 'the application must not receive the click')
+  assert.equal(first.stopped, true)
+  assert.equal(picker.isActive(), true, 'the mode ends on the button or Escape, not on a pick')
+
+  picker.setActive(false)
   assert.equal(picker.isActive(), false)
 })
 
