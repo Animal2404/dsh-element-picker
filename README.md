@@ -71,8 +71,16 @@ Two deliberate limits remain:
 
 By default a pick inserts a **reference chip** — the DSH-native shape for
 "compact in the composer, rich for the model". The composer shows one short
-label; when the message is sent, the chip's codec expands it into the locating
-block the model reads. Nothing else lands in the draft.
+label plus a small `×`; when the message is sent, the chip's codec expands it
+into the locating block the model reads. Nothing else lands in the draft.
+
+Clicking the `×` drops that chip. The glyph is a CSS `::after` on the chip (the
+chip's span is React's portal container, so an injected child would sit outside
+React's managed tree), and the click is resolved from the chip's own right-hand
+box. Removal itself goes through `consumeToken` over the chip's detect span —
+the composer's own verb for dropping a token —— so a user's `@file` chips in the
+same draft are untouched. `setDraft` is deliberately never used for removal:
+it rebuilds the draft as plain text and would flatten them.
 
 Where the chip is unavailable — no session-bound context yet, the input machine
 refusing the edit, or the codec source not registered — the picker falls back to
