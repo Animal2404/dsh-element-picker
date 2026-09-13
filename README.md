@@ -33,16 +33,17 @@ different job (a browser extension), not this one.
 5. Picks merge as you go: a second pick folds the chips into ONE group chip
    (`N 个元素`) whose payload lists each element's block in turn, so a multi-element
    request is a single pill in the composer and one grouped block for the model.
-   `Ctrl+Shift+G` does the same thing on demand. The hint bar names the shortcuts.
+   The hint bar names the only shortcut left: `Ctrl+Shift+E` to enter or leave, and
+   Escape to end.
 6. Hovering a chip lists what it holds — each element's summary, its tag and role,
    and the page it came from — in a scrollable panel, the way ZCode's
    picked-element pill behaves.
-5. `Ctrl+Shift+E` toggles selection mode from the keyboard. That is how you pick
+7. `Ctrl+Shift+E` toggles selection mode from the keyboard. That is how you pick
    inside a menu: open the menu first, toggle with the shortcut, then click the
    item — entering selection mode by click would dismiss the menu, and clicking
    inside it while selecting is swallowed by the picker before the menu's own
    `pointerdown` dismissal can fire.
-5. Selector generation prefers the hooks DSH exposes on purpose (`data-*`
+8. Selector generation prefers the hooks DSH exposes on purpose (`data-*`
    markers) over CSS-module class names, which are build-time hashes, and still
    falls back to a unique positional path when nothing stable exists.
 
@@ -144,7 +145,6 @@ that render them, so a follow-up request ("move this button") starts from a path
 instead of a class hash. The path is shortened to its last two segments, because
 every character lands in the user's composer.
 
-Hold **Shift** while picking to insert the full block instead of a chip.
 
 It emits: — `[元素] [选择器] [XPath] [位置] [样式] [属性] [源码] [HTML]`:
 

@@ -139,7 +139,12 @@ function overlayState(page) {
           conic: (style.backgroundImage ?? '').includes('conic-gradient'),
           composite: style.maskComposite || style.webkitMaskComposite || '',
           playState: style.animationPlayState,
+          duration: style.animationDuration,
         }
+      })(),
+      hintText: (() => {
+        const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
+        return hint === null ? '' : hint.innerText.replace(/\s+/g, ' ').trim()
       })(),
       infoVisible: (() => {
         const card = document.querySelector('[data-dsh-picker-ui="info"]')
@@ -384,6 +389,15 @@ async function runScenario(browser, mode, origin) {
     'the ring spins faster while selecting',
     active.slotRing?.duration === '0.9s',
     String(active.slotRing?.duration),
+  )
+  check(
+    'the hint ring turns at the working speed, and the hint names no removed shortcut',
+    active.hintRing?.duration === '0.9s' &&
+      active.hintText.includes('点元素插入定位信息') &&
+      active.hintText.includes('Esc 结束') &&
+      active.hintText.includes('Shift') === false &&
+      active.hintText.includes('Ctrl+Shift+G') === false,
+    JSON.stringify({ ring: active.hintRing?.duration, text: active.hintText }),
   )
   check('the hint bar is visible in selection mode', active.hintVisible === true)
   check(

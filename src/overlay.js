@@ -32,7 +32,7 @@ import { hoverFacts } from './describe.js'
 export const PICKER_MARKER = 'data-dsh-picker-ui'
 
 /** Hint text shown while selection mode is on. */
-export const HINT_TEXT = '连续选择：点元素插入定位信息 · Shift+点击插入完整信息 · Ctrl+Shift+E 进入/退出 · Ctrl+Shift+G 合并为元素组 · Esc 结束'
+export const HINT_TEXT = '连续选择：点元素插入定位信息 · Ctrl+Shift+E 进入/退出 · Esc 结束'
 
 /**
  * Keyboard toggle. Menus cannot be opened *while* selecting (their opening
@@ -41,9 +41,6 @@ export const HINT_TEXT = '连续选择：点元素插入定位信息 · Shift+�
  * window-capture swallow beats the menu's own dismissal.
  */
 const TOGGLE_SHORTCUT_KEY = 'e'
-
-/** Keyboard shortcut that groups the picker's chips into one element group. */
-const GROUP_SHORTCUT_KEY = 'g'
 
 /** Event types swallowed in the capture phase while selection mode is on. */
 const SWALLOWED_EVENTS = [
@@ -283,16 +280,10 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     // Selection mode deliberately stays on: picking several elements in a row is
     // the normal case, and the mode ends only on the button or Escape.
     emit({ type: 'pick' })
-    onPick(element, event)
+    onPick(element)
   }
 
   const onKeyDown = (event) => {
-    // Grouping works whether or not selection mode is on: it acts on the draft.
-    if (event.ctrlKey === true && event.shiftKey === true && event.key.toLowerCase() === GROUP_SHORTCUT_KEY) {
-      stopEvent(event)
-      emit({ type: 'group' })
-      return
-    }
     if (event.ctrlKey === true && event.shiftKey === true && event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY) {
       // Ours in both directions: the chord must not reach the application even
       // when it is turning selection mode on.

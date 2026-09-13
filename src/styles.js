@@ -89,8 +89,8 @@ export const PICKER_CSS = `
 }
 
 /* Sits below the session header: at the very top it covered the header's own
-   controls. The conic ring (same recipe as the control, turning slower because
-   this one is always on screen) draws its border. */
+   controls. The conic ring (same recipe and the same speed as the control's
+   ring while selection is on) draws its border. */
 [data-dsh-picker-ui="hint"] {
   position: fixed;
   left: 50%;
@@ -136,7 +136,9 @@ export const PICKER_CSS = `
   mask-composite: exclude;
   -webkit-mask-composite: destination-out;
   filter: hue-rotate(0);
-  animation: dsh-picker-rotate-hue linear 6s infinite;
+  /* The hint only exists while selection mode is on, so it always turns at the
+     working speed the control's ring takes when it is pressed. */
+  animation: dsh-picker-rotate-hue linear 900ms infinite;
   animation-play-state: running;
   pointer-events: none;
 }

@@ -274,9 +274,7 @@ const PICKER_STATE = {
   picker: null,
   inputActions: undefined,
   draft: '',
-  // A pick inserts a chip (compact in the composer, expanded on send); holding
-  // Shift while picking inserts the full text block instead.
-  detailed: false,
+  // A pick inserts a chip: compact in the composer, expanded on send.
   sessionId: undefined,
   ctx: undefined,
   // A chip whose source has no registered codec would fail to serialize when the
@@ -296,12 +294,6 @@ const PICKER_STATE = {
   },
 }
 
-/**
- * Insert one picked element's locating block into the composer.
- *
- * @param {Element} element - The resolved element.
- * @returns {void}
- */
 /**
  * The session a pick should land in.
  *
@@ -324,7 +316,17 @@ function resolveSessionId(ctx, fromProps) {
 }
 
 
-function insertPickedElement(element, detailed = false) {
+/**
+ * Insert one picked element's locating block into the composer.
+ *
+ * The chip is the DSH-native shape: a short label in the composer, expanded by
+ * the codec into the full block when the message is sent. Text is only what the
+ * fallback inserts when no chip can be placed at all.
+ *
+ * @param {Element} element - The resolved element.
+ * @returns {void}
+ */
+function insertPickedElement(element) {
   const doc = element.ownerDocument
   const win = doc.defaultView ?? undefined
   let text = ''
@@ -333,7 +335,6 @@ function insertPickedElement(element, detailed = false) {
       doc,
       win,
       scroll: { x: win?.scrollX ?? 0, y: win?.scrollY ?? 0 },
-      detailed: detailed === true,
     })
   } catch (error) {
     log('failed to describe element:', String(error))
@@ -348,18 +349,14 @@ function insertPickedElement(element, detailed = false) {
   const binding = resolveInputBinding(ctx, sessionId, (message) => log(message))
   const facade = binding === null ? null : binding.facade
 
-  // A chip is the DSH-native shape for this: compact in the composer, expanded
-  // into the block above by the chip's codec when the message is sent.
-  if (detailed !== true) {
-    // The trigger registry may not have been up when the plugin applied
-    // (service ordering), so registration is retried before the first chip use.
-    if (PICKER_STATE.chipReady !== true) {
-      PICKER_STATE.chipReady = registerChipSource(ctx)
-      if (PICKER_STATE.chipReady) log('chip codec registered on retry')
-    }
+  // The trigger registry may not have been up when the plugin applied (service
+  // ordering), so registration is retried before the first chip use.
+  if (PICKER_STATE.chipReady !== true) {
+    PICKER_STATE.chipReady = registerChipSource(ctx)
+    if (PICKER_STATE.chipReady) log('chip codec registered on retry')
   }
 
-  if (detailed !== true && PICKER_STATE.chipReady === true) {
+  if (PICKER_STATE.chipReady === true) {
     // The chip is a short label in the composer, but what it stands for — and
     // therefore what the model receives on send — is the FULL block: selector,
     // XPath, geometry, computed style, attributes, source, and an HTML excerpt.
@@ -552,27 +549,19 @@ function applyPicker(ctx) {
   const picker = createPicker({
     doc,
     win,
-    onPick: (element, event) => {
-      // Shift is the escape hatch to the verbose block; no config plumbing.
-      insertPickedElement(element, event !== undefined && event.shiftKey === true)
+    onPick: (element) => {
+      insertPickedElement(element)
     },
     onEvent: (event) => {
       if (event.type === 'pick' || event.type === 'cancel-escape' || event.type === 'pick-missed') {
         log('overlay event:', event.type)
-      }
-      if (event.type === 'group') {
-        groupPickedChips()
-        return
       }
       PICKER_STATE.publish()
     },
   })
   PICKER_STATE.picker = picker
 
-  log(
-    `mode: chip with a text fallback${chipsRegistered ? '' : ' — chip codec not registered yet'}` +
-      '; Shift+click inserts the full text block',
-  )
+  log(`mode: chip with a text fallback${chipsRegistered ? '' : ' — chip codec not registered yet'}`)
 
   ctx.slots.inject(SLOT, () =>
     ctx.slots.register(
