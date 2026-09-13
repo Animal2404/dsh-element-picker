@@ -417,7 +417,10 @@ await step('picking an element in the real UI', async () => {
   await page.waitForTimeout(1200)
   picked = await page.evaluate(() => {
     const composer = document.querySelector('[data-composer-input]')
-    return composer === null ? null : composer.textContent
+    if (composer === null) return null
+    // innerText keeps the paragraph breaks textContent drops, so the read-back
+    // can tell "inserted in order" from "inserted and reflowed".
+    return { text: composer.textContent, inner: composer.innerText, html: composer.innerHTML }
   })
   await page.screenshot({ path: join(out, '08-after-pick.png') })
 })
@@ -435,22 +438,31 @@ if (chosen !== null) {
   )
 }
 
-if (picked !== null && picked.includes('[元素]')) {
+if (picked !== null && picked.inner.includes('[元素]')) {
+  await writeFile(join(out, 'composer-after-pick.html'), picked.html)
   say('PASS  the pick inserted the locating block into the real composer')
+  say(`inserted text (innerText): ${JSON.stringify(picked.inner)}`)
+
+  const order = ['[元素]', '[选择器]', '[XPath]', '[位置]', '[样式]', '[属性]', '[源码]', '[HTML]']
+  const positions = order.map((label) => picked.inner.indexOf(label))
+  must(
+    'the block landed in order, each field on its own line',
+    positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])),
+    JSON.stringify(order.map((label, index) => `${label}@${positions[index]}`)),
+  )
   if (draftSeed !== '') {
     must(
       'the existing draft survived the insert',
-      picked.includes('draft text'),
-      JSON.stringify(picked.slice(0, 80)),
+      picked.inner.includes('draft text'),
+      JSON.stringify(picked.inner.slice(0, 80)),
     )
   }
-  say(`inserted text: ${JSON.stringify(picked)}`)
 } else if (picked === null) {
   skip('insertion into the real composer', 'no composer input to read back')
 } else {
   skip(
     'insertion into the real composer',
-    `composer text was ${JSON.stringify(picked)}; cascade reported: ${pluginLog.join(' | ') || 'no diagnostics'}`,
+    `composer text was ${JSON.stringify(picked.inner)}; cascade reported: ${pluginLog.join(' | ') || 'no diagnostics'}`,
   )
 }
 

@@ -116,7 +116,7 @@ test('the dom path drives the editable and places a caret first', () => {
   assert.equal(result.ok, true)
   assert.equal(result.path, 'dom')
   assert.match(result.note, /caret=placed/)
-  assert.equal(result.note.includes('routes[execCommand:ok]'), true, result.note)
+  assert.equal(result.note.includes('routes[paste-event:refused, execCommand:ok]'), true, result.note)
   assert.equal(input.textContent.includes('[元素] button "发送"'), true)
   assert.equal(doc.selection.node, input, 'the caret must be inside the editor')
 })
@@ -140,7 +140,7 @@ test('a refused execCommand falls through to a synthetic paste event', () => {
 
   assert.equal(result.ok, true)
   assert.equal(result.path, 'dom')
-  assert.equal(result.note.includes('routes[execCommand:refused, paste-event:ok]'), true, result.note)
+  assert.equal(result.note.includes('routes[paste-event:ok]'), true, result.note)
 })
 
 test('the paste payload survives a constructor that drops clipboardData', () => {
@@ -160,7 +160,7 @@ test('the paste payload survives a constructor that drops clipboardData', () => 
   })
 
   assert.equal(result.path, 'dom')
-  assert.equal(result.note.includes('routes[execCommand:refused, paste-event:ok]'), true, result.note)
+  assert.equal(result.note.includes('routes[paste-event:ok]'), true, result.note)
 })
 
 test('beforeinput is the last DOM route', () => {
@@ -182,7 +182,7 @@ test('beforeinput is the last DOM route', () => {
   assert.equal(result.ok, true)
   assert.equal(result.path, 'dom')
   assert.equal(
-    result.note.includes('routes[execCommand:refused, paste-event:refused, beforeinput:ok]'),
+    result.note.includes('routes[paste-event:refused, execCommand:refused, beforeinput:ok]'),
     true,
     result.note,
   )
@@ -202,7 +202,7 @@ test('a dom route that reports success without changing the editor is rejected',
 
   assert.equal(result.path, 'setDraft', 'the unverified dom attempt must not be trusted')
   assert.deepEqual(drafts, [`draft>${BLOCK}`])
-  assert.match(result.tried[1].error, /applied-but-no-text/)
+  assert.match(result.tried[1].error, /applied-but-misplaced/)
 })
 
 test('setDraft is the last resort and preserves the existing draft', () => {
