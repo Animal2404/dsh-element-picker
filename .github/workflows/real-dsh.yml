@@ -55,6 +55,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Syntax check every script
+        run: npm run syntax
+
       - name: Build the client bundle
         run: npm run build
 
