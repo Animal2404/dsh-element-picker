@@ -205,6 +205,8 @@ function harnessState(page) {
     injected: window.__harness.injected,
     mounted: window.__harness.mounted === undefined ? null : window.__harness.mounted.options,
     chipCodec: window.__harness.chips === undefined || window.__harness.chips.name === null ? null : window.__harness.chips.name,
+    chipPayloads: window.__harness.chips === undefined ? [] : window.__harness.chips.inserted.map((entry) => entry.clipboardText),
+    chipLabels: window.__harness.chips === undefined ? [] : window.__harness.chips.inserted.map((entry) => entry.label),
     reactVersion: window.React.version,
   }))
 }
@@ -440,6 +442,25 @@ async function runScenario(browser, mode, origin) {
       String(afterSecondPick.active),
     )
 
+    // Ctrl+Shift+G folds both picks into one group chip.
+    await page.keyboard.press('Control+Shift+G')
+    await page.waitForTimeout(400)
+    const grouped = await harnessState(page)
+    check(
+      'the shortcut groups the picks into one chip',
+      grouped.chipLabels.length === 1 && /元素组 2 个元素/.test(grouped.chipLabels[0] ?? ''),
+      JSON.stringify(grouped.chipLabels),
+    )
+    check(
+      'the group payload carries both elements',
+      (grouped.chipPayloads[0] ?? '').includes('[元素组] 2 个界面元素') &&
+        (grouped.chipPayloads[0] ?? '').includes('（1）') &&
+        (grouped.chipPayloads[0] ?? '').includes('（2）'),
+      String(grouped.chipPayloads[0]).slice(0, 120),
+    )
+    const afterGroup = await overlayState(page)
+    check('grouping leaves one chip in the composer', afterGroup.chips.length === 1, JSON.stringify(afterGroup.chips))
+
     // Leave the mode before exercising the ×: while selecting, clicks belong to
     // the picker, so the × is deliberately inert.
     await page.keyboard.press('Escape')
@@ -458,8 +479,8 @@ async function runScenario(browser, mode, origin) {
     await page.waitForTimeout(400)
     const afterRemove = await overlayState(page)
     check(
-      'clicking the × removed exactly that one chip',
-      afterRemove.chips.length === 1,
+      'clicking the × removed the group chip',
+      afterRemove.chips.length === 0,
       JSON.stringify(afterRemove.chips),
     )
     await shot('04b-chip-removed')

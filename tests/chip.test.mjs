@@ -11,6 +11,8 @@ import test from 'node:test'
 import { createDocument, createEvent, createWindow } from './helpers/dom-stub.mjs'
 import {
   CHIP_SELECTOR,
+  GROUP_LABEL_PREFIX,
+  groupElementChips,
   CHIP_SOURCE,
   REMOVE_ZONE_PX,
   chipIndexOf,
@@ -351,4 +353,70 @@ test('removal is a no-op when no picker chip is present', () => {
 
   assert.equal(removeChipElement({ doc, chip: orphan, onEvent: (m) => messages.push(m) }), null)
   assert.match(messages.join(' '), /no picker chip is present/)
+})
+
+test('grouping removes every chip and inserts one carrying all their blocks', () => {
+  const { doc } = fixture(0)
+  const calls = { consumed: [], inserted: [] }
+  let chips = [
+    { source: CHIP_SOURCE, offset: 0, length: 10, clipboardText: '[元素] a' },
+    { source: CHIP_SOURCE, offset: 13, length: 12, clipboardText: '[元素] b' },
+    { source: CHIP_SOURCE, offset: 28, length: 9, clipboardText: '[元素] c' },
+  ]
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 7, draft: 'x'.repeat(40), occurrences: chips.slice() }) },
+    consumeToken: (guard) => {
+      calls.consumed.push(guard.span)
+      const index = chips.findIndex((chip, position) => {
+        let detect = chip.offset
+        for (let i = 0; i < position; i += 1) detect -= chips[i].length - 1
+        return guard.span.start === detect
+      })
+      if (index < 0) return false
+      chips = chips.filter((_, position) => position !== index)
+      return true
+    },
+    insertReference: (ref) => {
+      calls.inserted.push(ref)
+      return true
+    },
+  }
+  const ctx = {
+    sessions: { scope: () => ({}) },
+    conversation: { input: { for: () => facade } },
+  }
+
+  const events = []
+  const result = groupElementChips({ ctx, sessionId: 's', onEvent: (message) => events.push(message) })
+
+  assert.deepEqual(result, { grouped: 3 })
+  assert.equal(calls.consumed.length, 3, 'each chip is consumed')
+  // Removed from the end backwards, so earlier spans stay valid.
+  assert.equal(calls.consumed[0].start > calls.consumed[1].start, true)
+  assert.equal(calls.inserted.length, 1)
+  const payload = calls.inserted[0].ref
+  assert.equal(calls.inserted[0].source, CHIP_SOURCE)
+  assert.equal(calls.inserted[0].label, `${GROUP_LABEL_PREFIX} 3 个元素`)
+  assert.equal(payload.startsWith('[元素组] 3 个界面元素'), true)
+  for (const block of ['[元素] a', '[元素] b', '[元素] c']) assert.equal(payload.includes(block), true)
+  assert.match(events.join(' '), /grouped 3 chips into one carrying a 5-line block/)
+})
+
+test('grouping needs at least two picks', () => {
+  const { doc } = fixture(0)
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 7, draft: '', occurrences: [{ source: CHIP_SOURCE, offset: 0, length: 4, clipboardText: '[元素] a' }] }) },
+    consumeToken: () => true,
+    insertReference: () => true,
+  }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+  const events = []
+  assert.equal(groupElementChips({ ctx, sessionId: 's', onEvent: (m) => events.push(m) }), null)
+  assert.match(events.join(' '), /at least two picked elements \(found 1\)/)
+})
+
+test('grouping leaves the draft alone when the session is unreachable', () => {
+  const events = []
+  assert.equal(groupElementChips({ ctx: {}, sessionId: 's', onEvent: (m) => events.push(m) }), null)
+  assert.match(events.join(' '), /no session-bound context/)
 })

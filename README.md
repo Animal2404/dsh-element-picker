@@ -30,6 +30,10 @@ different job (a browser extension), not this one.
    picked one after another.
 4. Click the button again, or press Escape: the selection ends. That is the only
    way out — a pick never ends it.
+5. `Ctrl+Shift+G` folds every picked element's chip in the draft into ONE group
+   chip (`元素组 N 个元素`) whose payload lists each element's block in turn, so a
+   multi-element request is one pill in the composer and one grouped block for the
+   model. The hint bar names both shortcuts.
 5. `Ctrl+Shift+E` toggles selection mode from the keyboard. That is how you pick
    inside a menu: open the menu first, toggle with the shortcut, then click the
    item — entering selection mode by click would dismiss the menu, and clicking

@@ -339,3 +339,98 @@ export function removeChipElement({ doc, facade, actx, chip, onEvent }) {
   note(`the chip was not removed (${attempts.join(', ') || 'no attempt'})`)
   return null
 }
+
+/** Label of the chip that stands for a group of picked elements. */
+export const GROUP_LABEL_PREFIX = '元素组'
+
+/**
+ * Fold every picked element's chip in the draft into ONE group chip.
+ *
+ * The chips are removed from the end backwards (so the earlier spans stay valid)
+ * through the same `consumeToken` the × uses, then a single chip carrying all
+ * their blocks is inserted — the model reads one grouped block instead of N
+ * separate ones, and the composer keeps one pill.
+ *
+ * @param {object} options - Grouping request.
+ * @param {object | undefined} options.ctx - Plugin (root) context.
+ * @param {string | undefined} options.sessionId - Session the composer belongs to.
+ * @param {(message: string) => void} [options.onEvent] - Diagnostics sink.
+ * @returns {{ grouped: number } | null} How many chips were grouped, else null.
+ */
+export function groupElementChips({ ctx, sessionId, onEvent }) {
+  const note = (message) => {
+    if (typeof onEvent === 'function') onEvent(message)
+  }
+  const binding = resolveInputBinding(ctx, sessionId, note)
+  if (binding === null) return null
+  const facade = binding.facade
+  const actx = binding.actx
+
+  const ours = () => {
+    const snapshot = typeof facade.state?.getSnapshot === 'function' ? facade.state.getSnapshot() : undefined
+    const occurrences = Array.isArray(snapshot?.occurrences) ? snapshot.occurrences : []
+    const mine = occurrences
+      .map((occurrence, index) => ({ occurrence, index }))
+      .filter((entry) => entry.occurrence.source === CHIP_SOURCE)
+    return { snapshot, occurrences, mine }
+  }
+
+  const first = ours()
+  if (first.mine.length < 2) {
+    note(`grouping needs at least two picked elements (found ${first.mine.length})`)
+    return null
+  }
+  const blocks = first.mine.map((entry) => entry.occurrence.clipboardText)
+  const total = blocks.length
+
+  // Remove from the last chip backwards: deleting the last one cannot shift the
+  // coordinates of the ones before it.
+  for (let remaining = total; remaining > 0; remaining -= 1) {
+    const state = ours()
+    if (state.mine.length === 0) break
+    const target = state.mine[state.mine.length - 1]
+    const span = chipSpan(state.occurrences, target.index, state.snapshot?.draftRev)
+    if (span === null) {
+      note('grouping stopped: a chip had no published occurrence')
+      return null
+    }
+    let applied = false
+    try {
+      if (typeof facade.consumeToken === 'function') {
+        applied = facade.consumeToken({ kind: 'span', span }) === true
+      } else if (actx !== null && actx !== undefined && typeof actx.bail === 'function') {
+        applied = actx.bail(actx, 'slash/input-consume-token', { guard: { kind: 'span', span } }) === true
+      }
+    } catch (error) {
+      note(`grouping removal threw: ${String(error)}`)
+      return null
+    }
+    if (!applied) {
+      note('grouping stopped: a chip refused to be removed')
+      return null
+    }
+  }
+
+  // Insert the group chip where the draft ends.
+  const after = ours()
+  const occurrences = after.occurrences
+  let detectLength = typeof after.snapshot?.draft === 'string' ? after.snapshot.draft.length : 0
+  for (const occurrence of occurrences) {
+    detectLength -= Math.max(0, (occurrence.length ?? 1) - 1)
+  }
+  const payload = [`[元素组] ${total} 个界面元素`, '', ...blocks.map((block, index) => `（${index + 1}）${block.trimEnd()}`)].join(String.fromCharCode(10)) + String.fromCharCode(10)
+
+  const inserted = insertElementChip({
+    ctx,
+    sessionId,
+    text: payload,
+    label: `${GROUP_LABEL_PREFIX} ${total} 个元素`,
+    onEvent: note,
+  })
+  if (inserted === null) {
+    note('grouping removed the chips but could not insert the group chip')
+    return null
+  }
+  note(`grouped ${total} chips into one carrying a ${payload.split(String.fromCharCode(10)).filter((line) => line !== '').length}-line block`)
+  return { grouped: total }
+}

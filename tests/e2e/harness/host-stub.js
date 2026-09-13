@@ -152,39 +152,56 @@
 
       var extra = {}
       if (mode === 'chip') {
+        // A small but faithful model of the real shell: the draft is a clipboard
+        // projection, each chip occupies one detect character, and removal is
+        // addressed by the detect span the caller computed.
+        chips.text = ''
+        var recompute = function () {
+          var text = chips.text
+          chips.occurrences = chips.inserted.map(function (entry) {
+            var occurrence = { offset: text.length, length: entry.clipboardText.length, clipboardText: entry.clipboardText, source: entry.source }
+            text += entry.clipboardText + ' '
+            return occurrence
+          })
+          chips.projection = text
+        }
+        var detectStartOf = function (index) {
+          var detect = chips.occurrences[index].offset
+          for (var i = 0; i < index; i += 1) detect -= Math.max(0, chips.occurrences[i].length - 1)
+          return detect
+        }
         extra.sessions = { scope: function (id) { return { id: id } } }
         extra.conversation = { input: { for: function () { return {
-          // Like the real shell: the draft is a clipboard projection in which a
-          // chip appears as its clipboard text.
           state: { getSnapshot: function () {
-            return { draftRev: 42, draft: chips.projection + composerInput().textContent, occurrences: chips.occurrences.slice() }
+            return { draftRev: 42, draft: chips.projection, occurrences: chips.occurrences.slice() }
           } },
           setDraft: function (text) {
-            chips.projection = ''
+            chips.text = text
+            chips.inserted = []
             composerInput().textContent = text
+            recompute()
             return true
           },
-          // Mirrors the real consumeToken: drop the chip the guard's span targets.
           consumeToken: function (guard) {
             if (guard.kind !== 'span' || guard.span.draftRev !== 42) return false
-            var all = document.querySelectorAll('[data-composer-chip]')
-            if (all.length === 0) return false
-            all[0].remove()
-            chips.inserted.shift()
-            chips.occurrences.shift()
-            chips.projection = ''
-            return true
+            for (var i = 0; i < chips.occurrences.length; i += 1) {
+              if (detectStartOf(i) !== guard.span.start) continue
+              var chipElements = composerInput().querySelectorAll('[data-composer-chip]')
+              if (chipElements[i] !== undefined) chipElements[i].remove()
+              chips.inserted.splice(i, 1)
+              recompute()
+              return true
+            }
+            return false
           },
-          caretSpan: function () { var text = composerInput().textContent; return { start: text.length, end: text.length } },
           insertReference: function (ref, span) {
-            chips.inserted.push({ ref: ref, span: span })
+            chips.inserted.push({ source: ref.source, clipboardText: ref.clipboardText, label: ref.label, span: span })
             var chip = document.createElement('span')
             chip.setAttribute('data-composer-chip', ref.source)
             chip.setAttribute('contenteditable', 'false')
             chip.textContent = ref.label
             composerInput().appendChild(chip)
-            chips.occurrences.push({ offset: chips.projection.length, length: ref.clipboardText.length })
-            chips.projection += ref.clipboardText + ' '
+            recompute()
             return true
           }
         } } } }

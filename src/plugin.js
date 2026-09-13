@@ -11,7 +11,7 @@
  */
 import React from 'react'
 
-import { chipLabel, insertElementChip, registerChipSource, removeChipElement, resolveInputBinding, watchChipRemoval } from './chip.js'
+import { chipLabel, groupElementChips, insertElementChip, registerChipSource, removeChipElement, resolveInputBinding, watchChipRemoval } from './chip.js'
 import { buildElementBlock } from './describe.js'
 import { watchTranscript } from './transcript.js'
 import { insertBlock } from './insert.js'
@@ -417,6 +417,28 @@ function insertPickedElement(element, detailed = false) {
 }
 
 /**
+ * Fold every picked element's chip in the draft into one group chip.
+ *
+ * @returns {void}
+ */
+function groupPickedChips() {
+  const ctx = PICKER_STATE.ctx
+  if (PICKER_STATE.chipReady !== true) {
+    PICKER_STATE.chipReady = registerChipSource(ctx)
+  }
+  if (PICKER_STATE.chipReady !== true) {
+    log('grouping skipped: the chip codec is not registered')
+    return
+  }
+  const result = groupElementChips({
+    ctx,
+    sessionId: resolveSessionId(ctx, PICKER_STATE.sessionId),
+    onEvent: (message) => log(message),
+  })
+  if (result === null) log('grouping produced nothing')
+}
+
+/**
  * Remove the chip a click landed on.
  *
  * @param {Element} chip - The chip to drop.
@@ -478,6 +500,10 @@ function applyPicker(ctx) {
     onEvent: (event) => {
       if (event.type === 'pick' || event.type === 'cancel-escape' || event.type === 'pick-missed') {
         log('overlay event:', event.type)
+      }
+      if (event.type === 'group') {
+        groupPickedChips()
+        return
       }
       PICKER_STATE.publish()
     },
