@@ -158,12 +158,15 @@ function insertPickedElement(element) {
   const result = insertBlock({
     text,
     doc,
+    win,
     draft: PICKER_STATE.draft,
     inputActions: PICKER_STATE.inputActions,
   })
 
   if (result.ok) {
-    log(`inserted via "${result.path}" (${text.split('\n').length} lines)`)
+    const earlier = result.tried.slice(0, -1)
+    const trail = earlier.length === 0 ? '' : ` after ${JSON.stringify(earlier)}`
+    log(`inserted via "${result.path}" (${result.note ?? 'no note'})${trail}`)
     return
   }
   log('insert failed; attempt trail:', JSON.stringify(result.tried))

@@ -94,11 +94,36 @@ export function matchesSelector(node, selector) {
 export function createDocument(options = {}) {
   const listeners = new Map()
   const exec = { result: false }
+  // Selection/Range stubs: the insert cascade places a caret inside the editor
+  // before driving it, and both facts are asserted by the suites.
+  const selection = {
+    anchorNode: null,
+    node: null,
+    removeAllRanges() {
+      selection.node = null
+    },
+    addRange(range) {
+      selection.node = range.node
+    },
+  }
 
   const doc = {
     nodeType: 9,
     listeners,
     exec,
+    selection,
+    getSelection() {
+      return selection
+    },
+    createRange() {
+      return {
+        node: null,
+        selectNodeContents(element) {
+          this.node = element
+        },
+        collapse() {},
+      }
+    },
     createElement(tag) {
       return createElement(tag, doc)
     },

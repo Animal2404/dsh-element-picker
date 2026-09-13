@@ -372,7 +372,21 @@ if (state.pickerSlotButton === 1) {
 
 // ---------------------------------------------------------- pick and insert
 let picked = null
+let draftSeed = ''
 await step('picking an element in the real UI', async () => {
+  // Type a draft first: inserting must not destroy what the user already wrote.
+  if ((await snapshot(page)).composerEditable) {
+    await page.click('[data-composer-input]')
+    draftSeed = 'draft text '
+    await page.keyboard.type(draftSeed)
+    await page.waitForTimeout(600)
+    const typed = await page.evaluate(
+      () => document.querySelector('[data-composer-input]').textContent,
+    )
+    must('a draft can be typed into the real composer', typed.includes('draft text'), JSON.stringify(typed))
+    await page.screenshot({ path: join(out, '06-draft-typed.png') })
+  }
+
   await page.click('[data-dsh-picker-ui="button"]')
   await page.waitForTimeout(300)
   const active = await page.evaluate(
@@ -411,8 +425,25 @@ await step('picking an element in the real UI', async () => {
 say(`plugin console: ${pluginLog.length === 0 ? '(none)' : JSON.stringify(pluginLog, null, 2)}`)
 await writeFile(join(out, 'plugin-console.log'), pluginLog.join('\n'))
 
+const chosen = pluginLog.join(' ').match(/inserted via "([^"]+)"/)
+say(`chosen insertion path on real DSH: ${chosen === null ? 'none' : chosen[1]}`)
+if (chosen !== null) {
+  must(
+    'the insert did not have to rewrite the whole draft',
+    chosen[1] !== 'setDraft',
+    `fell back to ${chosen[1]}`,
+  )
+}
+
 if (picked !== null && picked.includes('[元素]')) {
   say('PASS  the pick inserted the locating block into the real composer')
+  if (draftSeed !== '') {
+    must(
+      'the existing draft survived the insert',
+      picked.includes('draft text'),
+      JSON.stringify(picked.slice(0, 80)),
+    )
+  }
   say(`inserted text: ${JSON.stringify(picked)}`)
 } else if (picked === null) {
   skip('insertion into the real composer', 'no composer input to read back')
