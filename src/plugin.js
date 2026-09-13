@@ -11,6 +11,7 @@
  */
 import React from 'react'
 
+import { chipLabel, insertElementChip, registerChipSource } from './chip.js'
 import { buildElementBlock } from './describe.js'
 import { insertBlock } from './insert.js'
 import { createPicker } from './overlay.js'
@@ -18,6 +19,8 @@ import { installStyles } from './styles.js'
 
 /** Composer tool-row slot their entry opts into. */
 export const SLOT = 'conversation.input.left'
+
+/** Services this plugin's browser half consumes (declared in package.json too). */
 
 /** Entry id (a fresh id adds a cell beside the shipped entries). */
 export const ENTRY_ID = 'element-picker'
@@ -70,6 +73,7 @@ function PickerButton(props) {
   const inputActions = props.inputActions
   const state = PICKER_STATE
   state.inputActions = inputActions
+  state.sessionId = props.sessionId
   state.draft = typeof props.useInput === 'function' ? props.useInput((s) => s.draft) : ''
 
   const [active, setActive] = React.useState(state.picker === null ? false : state.picker.isActive())
@@ -124,6 +128,11 @@ const PICKER_STATE = {
   // Compact by default: one line per pick. `config: { detailed: true }` on the
   // plugin row restores the full block for debugging.
   detailed: false,
+  sessionId: undefined,
+  ctx: undefined,
+  // A chip whose source has no registered codec would fail to serialize when the
+  // message is sent, so a chip is only inserted once the codec is confirmed.
+  chipReady: false,
   listeners: new Set(),
   subscribe(listener) {
     PICKER_STATE.listeners.add(listener)
@@ -159,6 +168,31 @@ function insertPickedElement(element) {
     return
   }
 
+  // A chip is the DSH-native shape for this: compact in the composer, expanded
+  // into the block above by the chip's codec when the message is sent.
+  if (PICKER_STATE.detailed !== true) {
+    // The trigger registry may not have been up when the plugin applied
+    // (service ordering), so registration is retried before the first chip use.
+    if (PICKER_STATE.chipReady !== true) {
+      PICKER_STATE.chipReady = registerChipSource(PICKER_STATE.ctx)
+      if (PICKER_STATE.chipReady) log('chip codec registered on retry')
+    }
+  }
+
+  if (PICKER_STATE.detailed !== true && PICKER_STATE.chipReady === true) {
+    const chip = insertElementChip({
+      ctx: PICKER_STATE.ctx,
+      sessionId: PICKER_STATE.sessionId,
+      text,
+      label: chipLabel(element),
+      onEvent: (message) => log(message),
+    })
+    if (chip !== null) {
+      log(`inserted a ${chip} for ${element.tagName.toLowerCase()}`)
+      return
+    }
+  }
+
   const result = insertBlock({
     text,
     doc,
@@ -186,6 +220,9 @@ export function apply(ctx) {
   const win = window
   const doc = win.document
   PICKER_STATE.detailed = ctx !== undefined && ctx.config !== undefined && ctx.config.detailed === true
+  PICKER_STATE.ctx = ctx
+  const chipsRegistered = registerChipSource(ctx)
+  PICKER_STATE.chipReady = chipsRegistered
   const teardownStyles = installStyles(doc)
 
   const picker = createPicker({
@@ -203,7 +240,10 @@ export function apply(ctx) {
   })
   PICKER_STATE.picker = picker
 
-  log(`mode: ${PICKER_STATE.detailed ? 'detailed block' : 'compact one-line block'} per pick`)
+  log(
+    `mode: ${PICKER_STATE.detailed ? 'detailed text block' : 'chip (text fallback)'}` +
+      `${PICKER_STATE.detailed ? '' : chipsRegistered ? '' : ' — chip codec not registered'}`,
+  )
 
   ctx.slots.inject(SLOT, () =>
     ctx.slots.register(

@@ -28,6 +28,7 @@ export const SOURCE_FILES = [
   'hooks-map.js',
   'describe.js',
   'insert.js',
+  'chip.js',
   'overlay.js',
   'plugin.js',
 ]

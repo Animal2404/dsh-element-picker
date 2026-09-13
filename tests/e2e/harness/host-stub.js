@@ -129,6 +129,11 @@
       }
 
       inputActions = buildInputActions(mode)
+      // A chip-capable host: the picker prefers inserting a reference chip, and
+      // that path needs a session scope plus an input facade. Stubbed here so
+      // the decision itself is covered without a real DSH.
+      var chips = { registered: null, inserted: [], name: null }
+      window.__harness.chips = chips
 
       // Application-side listeners: if the picker leaks a click, these fire.
       document.querySelector('button[aria-label="发送消息"]').addEventListener('click', function () {
@@ -145,7 +150,26 @@
 
       window.__harness.exports = exports
 
-      exports.apply({
+      var extra = {}
+      if (mode === 'chip') {
+        extra.sessions = { scope: function (id) { return { id: id } } }
+        extra.conversation = { input: { for: function () { return {
+          state: { getSnapshot: function () { return { draftRev: 42, draft: composerInput().textContent } } },
+          caretSpan: function () { var text = composerInput().textContent; return { start: text.length, end: text.length } },
+          insertReference: function (ref, span) {
+            chips.inserted.push({ ref: ref, span: span })
+            var chip = document.createElement('span')
+            chip.setAttribute('data-composer-chip', ref.source)
+            chip.setAttribute('contenteditable', 'false')
+            chip.textContent = ref.label
+            composerInput().appendChild(chip)
+            return true
+          }
+        } } } }
+        extra.inputTriggers = { registerSource: function (source) { chips.registered = source; chips.name = source.name; return function () {} } }
+      }
+
+      exports.apply(Object.assign({
         slots: {
           inject: function (name, build) {
             window.__harness.injected = name
@@ -161,7 +185,7 @@
           if (typeof dispose === 'function') disposers.push(dispose)
           return function () {}
         },
-      })
+      }, extra))
     },
   }
 })()

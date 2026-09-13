@@ -246,10 +246,16 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     return active
   }
 
-  doc.addEventListener('pointermove', onPointerMove, true)
-  doc.addEventListener('click', onClick, true)
-  doc.addEventListener('keydown', onKeyDown, true)
-  for (const type of SWALLOWED_EVENTS) doc.addEventListener(type, swallow, true)
+  // Window capture, not document capture: DSH dismisses its own menus
+  // (model/effort, slash and @ menus, command cards) from window-capture
+  // pointerdown listeners, which run before any document-level handler. Bound
+  // here, the picker sees the event first, swallows it, and the menu survives
+  // long enough to be picked instead of vanishing under the pointer.
+  const captureTarget = typeof win.addEventListener === 'function' ? win : doc
+  captureTarget.addEventListener('pointermove', onPointerMove, true)
+  captureTarget.addEventListener('click', onClick, true)
+  captureTarget.addEventListener('keydown', onKeyDown, true)
+  for (const type of SWALLOWED_EVENTS) captureTarget.addEventListener(type, swallow, true)
   win.addEventListener('scroll', onScrollOrResize, true)
   win.addEventListener('resize', onScrollOrResize, true)
 
@@ -259,10 +265,10 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     setActive,
     toggle: () => setActive(!active),
     dispose: () => {
-      doc.removeEventListener('pointermove', onPointerMove, true)
-      doc.removeEventListener('click', onClick, true)
-      doc.removeEventListener('keydown', onKeyDown, true)
-      for (const type of SWALLOWED_EVENTS) doc.removeEventListener(type, swallow, true)
+      captureTarget.removeEventListener('pointermove', onPointerMove, true)
+      captureTarget.removeEventListener('click', onClick, true)
+      captureTarget.removeEventListener('keydown', onKeyDown, true)
+      for (const type of SWALLOWED_EVENTS) captureTarget.removeEventListener(type, swallow, true)
       win.removeEventListener('scroll', onScrollOrResize, true)
       win.removeEventListener('resize', onScrollOrResize, true)
       root.remove()

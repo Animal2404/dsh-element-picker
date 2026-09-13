@@ -114,6 +114,10 @@ function overlayState(page) {
         return getComputedStyle(hint).display !== 'none'
       })(),
       slotButtons: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
+      chips: [...document.querySelectorAll('[data-composer-chip]')].map((chip) => ({
+        source: chip.getAttribute('data-composer-chip'),
+        label: (chip.textContent ?? '').trim(),
+      })),
       draft: document.querySelector('[data-composer-input]').textContent,
     }
   })
@@ -131,6 +135,7 @@ function harnessState(page) {
     mode: window.__harness.mode,
     injected: window.__harness.injected,
     mounted: window.__harness.mounted === undefined ? null : window.__harness.mounted.options,
+    chipCodec: window.__harness.chips === undefined || window.__harness.chips.name === null ? null : window.__harness.chips.name,
     reactVersion: window.React.version,
   }))
 }
@@ -222,23 +227,45 @@ async function runScenario(browser, mode, origin) {
   const inserted = await overlayState(page)
   const afterInsert = await harnessState(page)
 
+  if (mode === 'chip') {
+    check('the click reached the composer as a chip', inserted.chips.length === 1, JSON.stringify(inserted.chips))
+  } else {
   check('the click reached the composer', inserted.draft.includes('[元素]'), inserted.draft)
   check('the block carries a selector', inserted.draft.includes('[选择器]'), inserted.draft)
   check('the block carries the DSH source file', /\[源码\] …\/.*\.tsx/.test(inserted.draft), inserted.draft)
   check(
     'the pick is one compact line, not a wall of text',
-    inserted.draft.trim().split('
-').filter((line) => line.trim() !== '').length === 1,
+    inserted.draft.trim().split('\n').filter((line) => line.trim() !== '').length === 1,
     JSON.stringify(inserted.draft),
   )
   check('the block names the picked element', inserted.draft.includes('发送'), inserted.draft)
+  }
   check('selection mode left after the pick', inserted.active === 'false', String(inserted.active))
   check('the highlight cleared after the pick', inserted.highlightVisible === false)
   check('the send button never received the swallowed click', afterInsert.calls.sends === 0, JSON.stringify(afterInsert.calls))
   check('no other application click was triggered', afterInsert.calls.sidebar === 0, JSON.stringify(afterInsert.calls))
   await shot('04-inserted')
 
-  if (mode === 'paste') {
+  if (mode === 'chip') {
+    check('the pick produced a composer chip', inserted.chips.length === 1, JSON.stringify(inserted.chips))
+    check(
+      'the chip belongs to the picker source',
+      inserted.chips[0]?.source === 'element-picker',
+      JSON.stringify(inserted.chips[0]),
+    )
+    check(
+      'the chip is a short label, not a text wall',
+      (inserted.chips[0]?.label ?? '').length > 0 &&
+        (inserted.chips[0]?.label ?? '').length < 70 &&
+        inserted.draft.includes('[元素]') === false,
+      JSON.stringify(inserted.chips[0]),
+    )
+    check(
+      'the codec that expands the chip on send was registered',
+      afterInsert.chipCodec === 'element-picker',
+      String(afterInsert.chipCodec),
+    )
+  } else if (mode === 'paste') {
     check('the shell paste path was chosen', afterInsert.calls.paste === 1, JSON.stringify(afterInsert.calls))
     check('setDraft was never used', afterInsert.calls.setDraft === 0, JSON.stringify(afterInsert.calls))
   } else if (mode === 'non-editable') {
@@ -283,7 +310,7 @@ const { server, origin } = await startServer()
 const browser = await chromium.launch()
 
 try {
-  for (const mode of ['dom', 'paste', 'non-editable']) {
+  for (const mode of ['dom', 'paste', 'non-editable', 'chip']) {
     await runScenario(browser, mode, origin)
   }
 } finally {

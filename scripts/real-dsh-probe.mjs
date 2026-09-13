@@ -420,9 +420,16 @@ await step('picking an element in the real UI', async () => {
   picked = await page.evaluate(() => {
     const composer = document.querySelector('[data-composer-input]')
     if (composer === null) return null
+    const chip = document.querySelector('[data-composer-chip]')
     // innerText keeps the paragraph breaks textContent drops, so the read-back
     // can tell "inserted in order" from "inserted and reflowed".
-    return { text: composer.textContent, inner: composer.innerText, html: composer.innerHTML }
+    return {
+      text: composer.textContent,
+      inner: composer.innerText,
+      html: composer.innerHTML,
+      chipSource: chip === null ? null : chip.getAttribute('data-composer-chip'),
+      chipLabel: chip === null ? null : (chip.textContent ?? '').trim(),
+    }
   })
   await page.screenshot({ path: join(out, '08-after-pick.png') })
 })
@@ -440,15 +447,41 @@ if (path === 'setDraft') {
   say('NOTE  the fallback rewrote the draft; reference chips would flatten to text')
 }
 
-if (picked !== null && picked.inner.includes('[元素]')) {
+if (picked !== null && picked.chipSource !== null) {
   await writeFile(join(out, 'composer-after-pick.html'), picked.html)
-  say('PASS  the pick inserted the locating block into the real composer')
+  say('PASS  the pick produced a composer chip')
+  say(`chip: source=${picked.chipSource} label=${JSON.stringify(picked.chipLabel)}`)
+  must(
+    'the chip belongs to the picker source',
+    picked.chipSource === 'element-picker',
+    String(picked.chipSource),
+  )
+  must(
+    'the chip is compact — a short label, not a text wall',
+    (picked.chipLabel ?? '').length > 0 &&
+      (picked.chipLabel ?? '').length < 70 &&
+      picked.inner.trim().split(String.fromCharCode(10)).filter((line) => line.trim() !== '').length === 1,
+    JSON.stringify({ label: picked.chipLabel, inner: picked.inner }),
+  )
+  if (draftSeed !== '') {
+    must(
+      'the existing draft survived the insert',
+      picked.inner.includes('draft text'),
+      JSON.stringify(picked.inner.slice(0, 80)),
+    )
+  }
+  must(
+    'the chip codec was registered, so the block can serialize on send',
+    !pluginLog.join(' ').includes('chip codec not registered'),
+  )
+} else if (picked !== null && picked.inner.includes('[元素]')) {
+  await writeFile(join(out, 'composer-after-pick.html'), picked.html)
+  say('NOTE  the chip path was unavailable; the compact text fallback was used')
   say(`inserted text (innerText): ${JSON.stringify(picked.inner)}`)
 
   const fields = ['[元素]', '[选择器]', '[源码]']
   const positions = fields.map((label) => picked.inner.indexOf(label))
-  const lines = picked.inner.trim().split('
-').filter((line) => line.trim() !== '')
+  const lines = picked.inner.trim().split(String.fromCharCode(10)).filter((line) => line.trim() !== '')
   must(
     'the pick is ONE compact line carrying element, selector, and source',
     positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])) &&

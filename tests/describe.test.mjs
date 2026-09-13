@@ -99,8 +99,7 @@ test('the default block is ONE line with element, selector, and a short source',
   const { doc, win, button } = fixture()
   const block = buildElementBlock(button, { doc, win, rect: button.getBoundingClientRect() })
 
-  assert.equal(block.split('
-').filter((line) => line !== '').length, 1, block)
+  assert.equal(block.split('\n').filter((line) => line !== '').length, 1, block)
   assert.match(block, /^\[元素\] button "发送"/)
   assert.match(block, /\[选择器\] button\[aria-label="发送消息"\]/)
   assert.match(block, /\[源码\] …\/skeleton\/InputBar\.tsx/)
@@ -117,8 +116,7 @@ test('the compact block omits the source when no hook is mapped', () => {
   doc.body.appendChild(orphan)
 
   const block = buildElementBlock(orphan, { doc, win })
-  assert.equal(block.split('
-').filter((line) => line !== '').length, 1)
+  assert.equal(block.split('\n').filter((line) => line !== '').length, 1)
   assert.equal(block.includes('[源码]'), false)
   assert.match(block, /^\[元素\] section "no hooks here" ｜ \[选择器\] /)
 })

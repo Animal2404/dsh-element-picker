@@ -16,9 +16,9 @@ different job (a browser extension), not this one.
    its own — an earlier floating button duplicated the control and sat on top of
    the composer's send button.
 2. Click it: selection mode turns on, the hint bar appears, and hovering
-   outlines the element the pick would target.
-3. Click an element: its locating block is inserted into the composer at the
-   caret, and selection mode exits.
+   outlines the element that will be picked.
+3. Click an element: it becomes a chip in the composer (or the compact text
+   line where chips are unavailable), and selection mode exits.
 4. Click the button again, or press Escape: selection mode exits without
    picking.
 5. Selector generation prefers the hooks DSH exposes on purpose (`data-*`
@@ -38,6 +38,22 @@ root carries `data-phase="active"`) and mounts the entire app under `div#root`,
 so accepting a generic marker or any id as a target outlined a 907×815
 application-sized box.
 
+### What cannot be picked, and why
+
+Two surfaces are structurally unreachable from a picker that lives in the page's
+top document, both in the right-sidebar document preview:
+
+- an **HTML file preview**, rendered in a `sandbox="allow-scripts"` iframe with a
+  blob URL and *no* `allow-same-origin`, so its document is an opaque origin the
+  parent cannot read or script;
+- a **PDF preview**, drawn by the bundled PDF.js straight into a `<canvas>` with
+  no text layer, so there is no element to point at.
+
+Everything else in the UI is either reachable or recovered: menus and popovers
+that dismiss themselves on `pointerdown` are why the picker listens on **window**
+capture rather than document capture — it has to see the event before the app's
+own window-capture dismissal closes the menu under the pointer.
+
 Two deliberate limits remain:
 
 - `html`/`body` are never picked (a `[元素] body` insert is noise);
@@ -46,9 +62,19 @@ Two deliberate limits remain:
   whose box contains the point. That fallback is why regions which used to be
   unselectable now respond.
 
-## Inserted block
+## What a pick inserts
 
-A pick inserts ONE line — the three things an agent needs to start:
+By default a pick inserts a **reference chip** — the DSH-native shape for
+"compact in the composer, rich for the model". The composer shows one short
+label; when the message is sent, the chip's codec expands it into the locating
+block the model reads. Nothing else lands in the draft.
+
+Where the chip is unavailable — no session-bound context yet, the input machine
+refusing the edit, or the codec source not registered — the picker falls back to
+a single compact text line, because a chip whose source has no codec would fail
+to serialize and block the send.
+
+The compact line (also what the fallback inserts):
 
 ```
 [元素] button.IXshSW_header "任务 6 已完成 · 1 进行中" ｜ [选择器] button.IXshSW_header ｜ [源码] …/skeleton/ConversationRoot.tsx
@@ -59,7 +85,7 @@ that render them, so a follow-up request ("move this button") starts from a path
 instead of a class hash. The path is shortened to its last two segments, because
 every character lands in the user's composer.
 
-The verbose shape is opt-in, per plugin row:
+The verbose text shape is opt-in, per plugin row (it also disables the chip):
 
 ```yaml
 - id: element-picker

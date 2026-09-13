@@ -32,13 +32,17 @@ function fixture() {
 }
 
 /**
- * @param {object} doc - Document stub.
+ * Fire a capture-phase event at the target the overlay actually listens on
+ * (the window, so the picker runs before DSH's own window-capture menu
+ * dismissals).
+ *
+ * @param {object} target - Window (or document) stub.
  * @param {string} type - Event type.
  * @param {object} event - Event object.
  * @returns {void}
  */
-function fire(doc, type, event) {
-  for (const handler of doc.listeners.get(`${type}:capture`) ?? []) handler(event)
+function fire(target, type, event) {
+  for (const handler of target.listeners.get(`${type}:capture`) ?? []) handler(event)
 }
 
 /**
@@ -85,7 +89,7 @@ test('hovering highlights the resolved element in viewport coordinates', () => {
   const picker = createPicker({ doc, win, onPick: () => {} })
   picker.setActive(true)
 
-  fire(doc, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
 
   const highlight = node(doc, 'highlight')
   assert.equal(highlight.getAttribute('data-dsh-picker-visible'), 'true')
@@ -103,7 +107,7 @@ test('a click picks the element, swallows the event, and leaves selection mode',
   picker.setActive(true)
 
   const event = createEvent('click', { target, clientX: 5, clientY: 5 })
-  fire(doc, 'click', event)
+  fire(win, 'click', event)
 
   assert.deepEqual(picks, [target])
   assert.equal(event.prevented, true, 'the application must not receive the click')
@@ -117,12 +121,12 @@ test('a swallowed pointerdown never reaches the application', () => {
   picker.setActive(true)
 
   const event = createEvent('pointerdown', { target, clientX: 5, clientY: 5 })
-  fire(doc, 'pointerdown', event)
+  fire(win, 'pointerdown', event)
   assert.equal(event.prevented, true)
 
   picker.setActive(false)
   const after = createEvent('pointerdown', { target, clientX: 5, clientY: 5 })
-  fire(doc, 'pointerdown', after)
+  fire(win, 'pointerdown', after)
   assert.equal(after.prevented, false, 'ordinary clicks must pass through when the picker is off')
 })
 
@@ -134,7 +138,7 @@ test('the picker never picks its own UI', () => {
 
   const own = node(doc, 'hint')
   const event = createEvent('click', { target: own, clientX: 1, clientY: 1 })
-  fire(doc, 'click', event)
+  fire(win, 'click', event)
 
   assert.deepEqual(picks, [])
   assert.equal(picker.isActive(), true, 'clicking the overlay is not a pick and does not exit')
@@ -146,12 +150,12 @@ test('Escape leaves selection mode without picking', () => {
   const picker = createPicker({ doc, win, onPick: (element) => picks.push(element) })
   picker.setActive(true)
 
-  fire(doc, 'keydown', createEvent('keydown', { key: 'Escape' }))
+  fire(win, 'keydown', createEvent('keydown', { key: 'Escape' }))
   assert.deepEqual(picks, [])
   assert.equal(picker.isActive(), false)
 
   const other = createEvent('keydown', { key: 'a' })
-  fire(doc, 'keydown', other)
+  fire(win, 'keydown', other)
   assert.equal(other.prevented, false, 'other keys are untouched')
 })
 
@@ -165,10 +169,10 @@ test('a point that hit-tests to nothing falls back to the deepest box', () => {
   const picker = createPicker({ doc, win, onPick: (element) => picks.push(element) })
   picker.setActive(true)
 
-  fire(doc, 'pointermove', createEvent('pointermove', { clientX: 110, clientY: 210 }))
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: 110, clientY: 210 }))
   assert.equal(node(doc, 'highlight').getAttribute('data-dsh-picker-visible'), 'true')
 
-  fire(doc, 'click', createEvent('click', { target, clientX: 110, clientY: 210 }))
+  fire(win, 'click', createEvent('click', { target, clientX: 110, clientY: 210 }))
   assert.deepEqual(picks, [target])
 })
 
@@ -178,11 +182,11 @@ test('moving onto empty space clears the highlight', () => {
   const picker = createPicker({ doc, win, onPick: () => {} })
   picker.setActive(true)
 
-  fire(doc, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
   assert.equal(node(doc, 'highlight').getAttribute('data-dsh-picker-visible'), 'true')
 
   // Off-screen space hit-tests to nothing at all: no element to outline.
-  fire(doc, 'pointermove', createEvent('pointermove', { clientX: -50, clientY: 5 }))
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: -50, clientY: 5 }))
   assert.equal(node(doc, 'highlight').getAttribute('data-dsh-picker-visible'), null)
 })
 
@@ -194,6 +198,6 @@ test('dispose removes the overlay and stops listening', () => {
   picker.dispose()
 
   assert.equal(node(doc, 'root'), null)
-  fire(doc, 'click', createEvent('click', { target, clientX: 5, clientY: 5 }))
+  fire(win, 'click', createEvent('click', { target, clientX: 5, clientY: 5 }))
   assert.deepEqual(picks, [])
 })
