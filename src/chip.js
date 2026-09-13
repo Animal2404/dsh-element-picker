@@ -332,8 +332,7 @@ export function removeChipElement({ doc, win, chip, facade, blockText, onEvent }
     try {
       const snapshot = typeof facade.state?.getSnapshot === 'function' ? facade.state.getSnapshot() : undefined
       const draft = typeof snapshot?.draft === 'string' ? snapshot.draft : undefined
-      const line = block.replace(/
-+$/, '')
+      const line = block.replace(/\n+$/, '')
       if (draft !== undefined && draft.includes(line)) {
         facade.setDraft(draft.replace(line, ''))
         if (countChips(doc) < before) return 'setDraft'

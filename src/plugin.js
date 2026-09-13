@@ -11,19 +11,7 @@
  */
 import React from 'react'
 
-import {
-  CHIP_BLOCK_ATTR,
-  CHIP_SOURCE,
-  chipLabel,
-  decorateChips,
-  insertElementChip,
-  registerChipSource,
-  rememberChip,
-  rememberedBlock,
-  removeChipElement,
-  resolveFacade,
-  watchChips,
-} from './chip.js'
+import { CHIP_BLOCK_ATTR, CHIP_SOURCE, chipLabel, decorateChips, insertElementChip, registerChipSource, rememberChip, rememberedBlock, removeChipElement, resolveFacade, watchChips } from './chip.js'
 import { buildElementBlock } from './describe.js'
 import { insertBlock } from './insert.js'
 import { createPicker } from './overlay.js'
