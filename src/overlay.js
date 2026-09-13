@@ -121,9 +121,38 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   const host = doc.body ?? doc.documentElement
   host.appendChild(root)
   place()
+  watchLayout()
 
   let active = false
   let current = null
+  let layoutObserver = null
+
+  /**
+   * Re-anchor whenever the app's own layout changes.
+   *
+   * `place()` runs once on mount, but DSH renders its composer *after* plugins
+   * apply — a one-shot placement leaves the button in the corner until the user
+   * happens to resize or scroll. A coalesced mutation observer keeps it beside
+   * the composer without a polling loop.
+   *
+   * @returns {void}
+   */
+  function watchLayout() {
+    if (typeof win.MutationObserver !== 'function') return
+    let queued = false
+    const flush = () => {
+      queued = false
+      place()
+      if (active) paint()
+    }
+    layoutObserver = new win.MutationObserver(() => {
+      if (queued) return
+      queued = true
+      if (typeof win.requestAnimationFrame === 'function') win.requestAnimationFrame(flush)
+      else setTimeout(flush, 16)
+    })
+    layoutObserver.observe(host, { childList: true, subtree: true })
+  }
 
   /**
    * Anchor the floating button just above the composer card's right edge.
@@ -276,6 +305,9 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     setActive,
     toggle: () => setActive(!active),
     dispose: () => {
+      if (layoutObserver !== null && typeof layoutObserver.disconnect === 'function') {
+        layoutObserver.disconnect()
+      }
       doc.removeEventListener('pointermove', onPointerMove, true)
       doc.removeEventListener('click', onClick, true)
       doc.removeEventListener('keydown', onKeyDown, true)

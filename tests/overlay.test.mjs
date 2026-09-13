@@ -187,6 +187,35 @@ test('without a composer card the corner placement stands', () => {
   assert.equal(picker.isActive(), false)
 })
 
+test('a composer that mounts after the plugin re-anchors the button', () => {
+  const doc = createDocument()
+  const win = createWindow(doc)
+  win.innerWidth = 1280
+  createPicker({ doc, win, onPick: () => {} })
+  const button = node(doc, 'button')
+  assert.equal(button.style.bottom, '20px', 'starts in the corner')
+
+  // DSH renders its composer after plugins apply, so the layout is watched.
+  const card = doc.createElement('div')
+  card.setAttribute('data-composer-card', '')
+  card.getBoundingClientRect = () => ({ left: 700, top: 600, width: 300, height: 120, right: 1000, bottom: 720 })
+  doc.body.appendChild(card)
+
+  assert.equal(win.observers.length, 1, 'the layout must be observed')
+  win.observers[0].trigger()
+
+  assert.equal(button.style.bottom, 'auto')
+  assert.equal(button.style.top, '552px')
+  assert.equal(button.style.right, '288px')
+})
+
+test('dispose stops observing the layout', () => {
+  const { doc, win } = fixture()
+  const picker = createPicker({ doc, win, onPick: () => {} })
+  picker.dispose()
+  assert.equal(win.observers[0].disconnected, true)
+})
+
 test('dispose removes the overlay and stops listening', () => {
   const { doc, win, target } = fixture()
   const picks = []

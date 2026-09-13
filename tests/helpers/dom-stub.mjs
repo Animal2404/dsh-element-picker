@@ -278,11 +278,46 @@ export function createElement(tag, doc) {
  */
 export function createWindow(doc, computedStyle = {}) {
   const listeners = new Map()
+  const observers = []
+
+  /**
+   * Minimal MutationObserver stub: records the observer so a test can fire it
+   * explicitly, which is how the layout re-anchor is exercised.
+   */
+  class StubMutationObserver {
+    constructor(callback) {
+      this.callback = callback
+      this.target = null
+      this.disconnected = false
+      observers.push(this)
+    }
+
+    observe(target, options) {
+      this.target = target
+      this.options = options
+    }
+
+    disconnect() {
+      this.disconnected = true
+    }
+
+    /** @returns {void} Invoke the callback the way a mutation would. */
+    trigger() {
+      this.callback([])
+    }
+  }
+
   return {
     document: doc,
     scrollX: 0,
     scrollY: 0,
     listeners,
+    observers,
+    MutationObserver: StubMutationObserver,
+    requestAnimationFrame: (callback) => {
+      callback()
+      return 0
+    },
     getComputedStyle: () => computedStyle,
     addEventListener(type, handler, capture) {
       const key = capture ? `${type}:capture` : type
