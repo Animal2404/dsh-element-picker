@@ -121,6 +121,9 @@ const PICKER_STATE = {
   picker: null,
   inputActions: undefined,
   draft: '',
+  // Compact by default: one line per pick. `config: { detailed: true }` on the
+  // plugin row restores the full block for debugging.
+  detailed: false,
   listeners: new Set(),
   subscribe(listener) {
     PICKER_STATE.listeners.add(listener)
@@ -149,6 +152,7 @@ function insertPickedElement(element) {
       doc,
       win,
       scroll: { x: win?.scrollX ?? 0, y: win?.scrollY ?? 0 },
+      detailed: PICKER_STATE.detailed,
     })
   } catch (error) {
     log('failed to describe element:', String(error))
@@ -181,6 +185,7 @@ function insertPickedElement(element) {
 export function apply(ctx) {
   const win = window
   const doc = win.document
+  PICKER_STATE.detailed = ctx !== undefined && ctx.config !== undefined && ctx.config.detailed === true
   const teardownStyles = installStyles(doc)
 
   const picker = createPicker({
@@ -197,6 +202,8 @@ export function apply(ctx) {
     },
   })
   PICKER_STATE.picker = picker
+
+  log(`mode: ${PICKER_STATE.detailed ? 'detailed block' : 'compact one-line block'} per pick`)
 
   ctx.slots.inject(SLOT, () =>
     ctx.slots.register(

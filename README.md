@@ -25,27 +25,49 @@ different job (a browser extension), not this one.
    markers) over CSS-module class names, which are build-time hashes, and still
    falls back to a unique positional path when nothing stable exists.
 
-### What gets picked
+### What gets picked: exactly what you pointed at
 
-The pointer usually lands on a leaf — an icon's `<path>`, a label `<span>` — so
-the ancestry is searched for the nearest thing that identifies itself:
+The pick is the element under the pointer, with no climbing. That is what ZCode
+does, and it is what people expect: outline a row and you get the row.
 
-- a component hook (`data-composer-input`, `data-composer-card`, …),
-- a control: `button`/`a[href]`/`input`/`select`/`textarea`/editable regions, or
-  an interactive ARIA role.
+Earlier versions climbed to "the nearest thing that looks like a target", and the
+result was silently wrong: pointing at a goal row handed back the `<button>` of
+the collapsible section above it. Two field measurements had already shown how
+fragile that heuristic is — DSH marks whole panels with `data-phase` (a session
+root carries `data-phase="active"`) and mounts the entire app under `div#root`,
+so accepting a generic marker or any id as a target outlined a 907×815
+application-sized box.
 
-Clicking an icon therefore picks the button it belongs to, and clicking inside
-the composer picks the editable itself. When the ancestry identifies nothing, the
-element under the pointer IS the answer — deliberately, because climbing past
-that is what makes a click inside a panel select the whole panel. Two measured
-traps shaped this rule: DSH marks whole panels with `data-phase` (a session root
-carries `data-phase="active"`), and it mounts the entire app under `div#root`, so
-accepting either a generic marker or *any* id as a target put a 907x815
-application-sized box in the highlight. Ids and markers still serve selector
-generation for an element that was already chosen; they just do not decide what
-gets picked.
+Two deliberate limits remain:
+
+- `html`/`body` are never picked (a `[元素] body` insert is noise);
+- when hit-testing returns nothing at all — a point covered only by
+  `pointer-events: none` surfaces — the picker falls back to the deepest element
+  whose box contains the point. That fallback is why regions which used to be
+  unselectable now respond.
 
 ## Inserted block
+
+A pick inserts ONE line — the three things an agent needs to start:
+
+```
+[元素] button.IXshSW_header "任务 6 已完成 · 1 进行中" ｜ [选择器] button.IXshSW_header ｜ [源码] …/skeleton/ConversationRoot.tsx
+```
+
+`[源码]` is the DSH-specific part: stable hooks are mapped to the source files
+that render them, so a follow-up request ("move this button") starts from a path
+instead of a class hash. The path is shortened to its last two segments, because
+every character lands in the user's composer.
+
+The verbose shape is opt-in, per plugin row:
+
+```yaml
+- id: element-picker
+  config:
+    detailed: true
+```
+
+which emits the full block — `[元素] [选择器] [XPath] [位置] [样式] [属性] [源码] [HTML]`:
 
 ```
 [元素] button.primary "发送"
@@ -57,10 +79,6 @@ gets picked.
 [源码] packages/client/ui-conversation/src/client/skeleton/InputBar.tsx (data-composer-card)
 [HTML] <button aria-label="发送消息" data-phase="idle">发送</button>
 ```
-
-The `[源码]` line is the DSH-specific part: stable hooks are mapped to the
-source files that render them, so a follow-up request ("move this button")
-starts from a path instead of a class hash.
 
 ## Insertion
 
@@ -163,7 +181,7 @@ profile's `cordis.patch.yml`:
 package.json          dsh.bundle.patch + dsh.client + exports["./client"]
 cordis.patch.yml      loader row: id element-picker
 src/styles.js         overlay CSS (namespaced, injected as one <style>)
-src/selector.js       CSS selector, XPath, hook resolution, summary
+src/selector.js       CSS selector, XPath, element summary
 src/hooks-map.js      stable DOM hook -> DSH source file
 src/describe.js       the inserted block
 src/insert.js         the paste/dom/setDraft cascade

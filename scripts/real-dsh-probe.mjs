@@ -445,12 +445,15 @@ if (picked !== null && picked.inner.includes('[元素]')) {
   say('PASS  the pick inserted the locating block into the real composer')
   say(`inserted text (innerText): ${JSON.stringify(picked.inner)}`)
 
-  const order = ['[元素]', '[选择器]', '[XPath]', '[位置]', '[样式]', '[属性]', '[源码]', '[HTML]']
-  const positions = order.map((label) => picked.inner.indexOf(label))
+  const fields = ['[元素]', '[选择器]', '[源码]']
+  const positions = fields.map((label) => picked.inner.indexOf(label))
+  const lines = picked.inner.trim().split('
+').filter((line) => line.trim() !== '')
   must(
-    'the block landed in order, each field on its own line',
-    positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])),
-    JSON.stringify(order.map((label, index) => `${label}@${positions[index]}`)),
+    'the pick is ONE compact line carrying element, selector, and source',
+    positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])) &&
+      lines.length === 1,
+    JSON.stringify({ lines, positions }),
   )
   if (draftSeed !== '') {
     must(

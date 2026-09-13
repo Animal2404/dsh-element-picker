@@ -224,7 +224,13 @@ async function runScenario(browser, mode, origin) {
 
   check('the click reached the composer', inserted.draft.includes('[元素]'), inserted.draft)
   check('the block carries a selector', inserted.draft.includes('[选择器]'), inserted.draft)
-  check('the block carries the DSH source file', inserted.draft.includes('[源码] packages/client/ui-conversation'), inserted.draft)
+  check('the block carries the DSH source file', /\[源码\] …\/.*\.tsx/.test(inserted.draft), inserted.draft)
+  check(
+    'the pick is one compact line, not a wall of text',
+    inserted.draft.trim().split('
+').filter((line) => line.trim() !== '').length === 1,
+    JSON.stringify(inserted.draft),
+  )
   check('the block names the picked element', inserted.draft.includes('发送'), inserted.draft)
   check('selection mode left after the pick', inserted.active === 'false', String(inserted.active))
   check('the highlight cleared after the pick', inserted.highlightVisible === false)

@@ -115,22 +115,58 @@ function rectLine(element, rect, scroll) {
 }
 
 /**
- * Build the multi-line locating block for one element.
+ * Shorten a repository path to its last two segments.
  *
- * @param {Element} element - Element to describe (already resolved to the
- *   meaningful target by `resolveTarget`).
+ * The compact block is inserted into a chat composer, so a 70-character path
+ * costs more than it earns: `…/skeleton/ConversationRoot.tsx` still says which
+ * file to open.
+ *
+ * @param {string} path - Repository path.
+ * @returns {string} A shortened path.
+ */
+function shortPath(path) {
+  const parts = path.split('/')
+  if (parts.length <= 2) return path
+  return `…/${parts.slice(-2).join('/')}`
+}
+
+/**
+ * Build the locating information for one element.
+ *
+ * Two shapes, because the composer is a chat input:
+ *
+ * - compact (default) — ONE line, the three things an agent needs to start:
+ *   `[元素] button.IXshSW_header "任务 6 已完成" ｜ [选择器] button.IXshSW_header ｜ [源码] …/skeleton/ConversationRoot.tsx`
+ * - detailed (`detailed: true`) — the full multi-line block with XPath,
+ *   geometry, computed style, attributes, and an HTML excerpt.
+ *
+ * The verbose shape is what the first shipped version always inserted, and a
+ * wall of eight lines per pick is the opposite of how ZCode presents a picked
+ * element.
+ *
+ * @param {Element} element - Element under the pointer.
  * @param {object} [env] - Environment overrides.
  * @param {Window} [env.win] - Window for computed styles.
  * @param {Document} [env.doc] - Document for source lookup.
  * @param {DOMRect} [env.rect] - Pre-measured bounds.
  * @param {{ x: number, y: number }} [env.scroll] - Page scroll offset.
+ * @param {boolean} [env.detailed] - Emit the full multi-line block.
  * @returns {string} The block, newline-terminated.
  */
 export function buildElementBlock(element, env = {}) {
   const doc = env.doc ?? element.ownerDocument
+  const selector = generateSelector(element)
+  const source = sourceFor(element, doc)
+
+  if (env.detailed !== true) {
+    const parts = [`[元素] ${describeElement(element)}`]
+    if (selector !== '') parts.push(`[选择器] ${selector}`)
+    if (source !== null) parts.push(`[源码] ${shortPath(source.path)}`)
+    return `${parts.join(' ｜ ')}\n`
+  }
+
   const lines = [`[元素] ${describeElement(element)}`]
 
-  const selector = generateSelector(element)
   if (selector !== '') lines.push(`[选择器] ${selector}`)
 
   const xpath = generateXPath(element)
@@ -145,7 +181,6 @@ export function buildElementBlock(element, env = {}) {
   const attributes = attributeLine(element)
   if (attributes !== '') lines.push(`[属性] ${attributes}`)
 
-  const source = sourceFor(element, doc)
   if (source !== null) {
     lines.push(`[源码] ${source.path} (${source.hook})`)
   }

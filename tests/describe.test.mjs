@@ -46,13 +46,14 @@ function fixture() {
   return { doc, win: createWindow(doc, STYLE), button }
 }
 
-test('the block carries element, selector, xpath, position, style, attributes, source, and html', () => {
+test('the detailed block carries element, selector, xpath, position, style, attributes, source, and html', () => {
   const { doc, win, button } = fixture()
   const block = buildElementBlock(button, {
     doc,
     win,
     scroll: { x: 0, y: 120 },
     rect: button.getBoundingClientRect(),
+    detailed: true,
   })
   const lines = block.trimEnd().split('\n')
 
@@ -72,12 +73,12 @@ test('the block carries element, selector, xpath, position, style, attributes, s
 
 test('the source line names the hook that matched, or is omitted entirely', () => {
   const { doc, win, button } = fixture()
-  const block = buildElementBlock(button, { doc, win, rect: button.getBoundingClientRect() })
+  const block = buildElementBlock(button, { doc, win, detailed: true, rect: button.getBoundingClientRect() })
   assert.match(block, /\(data-composer-card\)/, 'the nearest hooked ancestor supplies the mapping')
 
   const orphan = doc.createElement('div')
   orphan.textContent = 'plain'
-  const bare = buildElementBlock(orphan, { doc, win })
+  const bare = buildElementBlock(orphan, { doc, win, detailed: true })
   assert.equal(bare.includes('[源码]'), false)
 })
 
@@ -87,10 +88,39 @@ test('a source-less element still produces a usable block', () => {
   orphan.textContent = 'no hooks here'
   doc.body.appendChild(orphan)
 
-  const block = buildElementBlock(orphan, { doc, win })
+  const block = buildElementBlock(orphan, { doc, win, detailed: true })
   assert.match(block, /^\[元素\] section "no hooks here"$/m)
   assert.match(block, /^\[选择器\] /m)
   assert.equal(block.endsWith('\n'), true)
+})
+
+
+test('the default block is ONE line with element, selector, and a short source', () => {
+  const { doc, win, button } = fixture()
+  const block = buildElementBlock(button, { doc, win, rect: button.getBoundingClientRect() })
+
+  assert.equal(block.split('
+').filter((line) => line !== '').length, 1, block)
+  assert.match(block, /^\[元素\] button "发送"/)
+  assert.match(block, /\[选择器\] button\[aria-label="发送消息"\]/)
+  assert.match(block, /\[源码\] …\/skeleton\/InputBar\.tsx/)
+  assert.equal(block.includes('[HTML]'), false, 'no HTML excerpt in the compact shape')
+  assert.equal(block.includes('[XPath]'), false)
+  assert.equal(block.endsWith('
+'), true)
+})
+
+test('the compact block omits the source when no hook is mapped', () => {
+  const { doc, win } = fixture()
+  const orphan = doc.createElement('section')
+  orphan.textContent = 'no hooks here'
+  doc.body.appendChild(orphan)
+
+  const block = buildElementBlock(orphan, { doc, win })
+  assert.equal(block.split('
+').filter((line) => line !== '').length, 1)
+  assert.equal(block.includes('[源码]'), false)
+  assert.match(block, /^\[元素\] section "no hooks here" ｜ \[选择器\] /)
 })
 
 test('the hook map is not empty and every entry points at a repository path', () => {
@@ -101,7 +131,7 @@ test('the hook map is not empty and every entry points at a repository path', ()
 
 test('a missing getComputedStyle degrades instead of throwing', () => {
   const { doc, button } = fixture()
-  const block = buildElementBlock(button, { doc, win: undefined })
+  const block = buildElementBlock(button, { doc, win: undefined, detailed: true })
   assert.equal(block.includes('[样式]'), false)
   assert.match(block, /^\[元素\] /m)
 })

@@ -155,6 +155,23 @@ test('Escape leaves selection mode without picking', () => {
   assert.equal(other.prevented, false, 'other keys are untouched')
 })
 
+test('a point that hit-tests to nothing falls back to the deepest box', () => {
+  const { doc, win, target } = fixture()
+  // pointer-events:none regions (and any point whose whole stack is the picker's
+  // own UI) come back empty from elementsFromPoint; the geometric walk still
+  // finds the element, which is what makes those regions selectable.
+  doc.elementsFromPoint = () => []
+  const picks = []
+  const picker = createPicker({ doc, win, onPick: (element) => picks.push(element) })
+  picker.setActive(true)
+
+  fire(doc, 'pointermove', createEvent('pointermove', { clientX: 110, clientY: 210 }))
+  assert.equal(node(doc, 'highlight').getAttribute('data-dsh-picker-visible'), 'true')
+
+  fire(doc, 'click', createEvent('click', { target, clientX: 110, clientY: 210 }))
+  assert.deepEqual(picks, [target])
+})
+
 test('moving onto empty space clears the highlight', () => {
   const { doc, win, target } = fixture()
   doc.elementsFromPoint = (x) => (x < 0 ? [] : [target])

@@ -7,11 +7,16 @@
  * overlay deliberately owns no button of its own: an earlier floating button
  * duplicated the control and sat over the composer.
  *
- * Flow (matching ZCode's behaviour):
+ * The pick is exactly the element under the pointer. No climbing: pointing at a
+ * row means the row, pointing at an icon means the icon (this is what ZCode
+ * does, and climbing to "the nearest control" is what silently handed people an
+ * ancestor's `<button>` instead of the thing they outlined).
+ *
+ * Flow:
  *   click the tool-row button -> selection mode on, hovering outlines the
- *   resolved element -> click an element -> the pick is reported and selection
- *   mode exits -> click the button again (or press Escape) to leave without
- *   picking.
+ *   element under the pointer -> click an element -> the pick is reported and
+ *   selection mode exits -> click the button again (or press Escape) to leave
+ *   without picking.
  *
  * While selection mode is on, the click must NOT reach the application: every
  * relevant event is swallowed in the capture phase, and the picker's own nodes
@@ -19,7 +24,6 @@
  *
  * Plain DOM (no framework): the plugin's React entry only calls `toggle()`.
  */
-import { resolveTarget } from './selector.js'
 
 /** Marker attribute on every node this overlay owns. */
 export const PICKER_MARKER = 'data-dsh-picker-ui'
@@ -111,11 +115,59 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   }
 
   /**
-   * Resolve the element under a viewport point, ignoring the picker's own nodes.
+   * Depth of an element in the tree, used to pick the innermost candidate when
+   * hit-testing cannot answer.
+   *
+   * @param {Element} element - Candidate element.
+   * @returns {number} Ancestor count.
+   */
+  const depthOf = (element) => {
+    let depth = 0
+    let node = element.parentElement
+    while (node !== null) {
+      depth += 1
+      node = node.parentElement
+    }
+    return depth
+  }
+
+  /**
+   * Last-resort lookup for points where hit-testing returns nothing.
+   *
+   * `elementsFromPoint` skips anything with `pointer-events: none` (and any
+   * region whose whole stack is the picker's own UI), which is exactly the
+   * "some elements cannot be selected" case. This walks the tree instead and
+   * takes the deepest element whose box contains the point. It only runs when
+   * the cheap path failed, so its cost is paid once per click, not per move.
    *
    * @param {number} x - Viewport x.
    * @param {number} y - Viewport y.
-   * @returns {Element | null} The resolved target, else null.
+   * @returns {Element | null} The innermost containing element, else null.
+   */
+  const geometricAt = (x, y) => {
+    if (typeof doc.querySelectorAll !== 'function') return null
+    let best = null
+    let bestDepth = -1
+    for (const element of doc.querySelectorAll('*')) {
+      if (isOwnNode(element, doc)) continue
+      if (element === doc.documentElement || element === doc.body) continue
+      const box = element.getBoundingClientRect()
+      if (box.width === 0 || box.height === 0) continue
+      if (x < box.left || x > box.right || y < box.top || y > box.bottom) continue
+      const depth = depthOf(element)
+      if (depth <= bestDepth) continue
+      bestDepth = depth
+      best = element
+    }
+    return best
+  }
+
+  /**
+   * The element under a viewport point, ignoring the picker's own nodes.
+   *
+   * @param {number} x - Viewport x.
+   * @param {number} y - Viewport y.
+   * @returns {Element | null} The element under the pointer, else null.
    */
   const targetAt = (x, y) => {
     const stack =
@@ -123,10 +175,13 @@ export function createPicker({ doc, win, onPick, onEvent }) {
         ? doc.elementsFromPoint(x, y)
         : [doc.elementFromPoint(x, y)]
     for (const node of stack) {
-      if (node === null || isOwnNode(node, doc)) continue
-      return resolveTarget(node, doc)
+      if (node === null || node.nodeType !== 1) continue
+      if (isOwnNode(node, doc)) continue
+      // The page itself is never the answer: picking `html`/`body` is noise.
+      if (node === doc.documentElement || node === doc.body) continue
+      return node
     }
-    return null
+    return geometricAt(x, y)
   }
 
   const onPointerMove = (event) => {
