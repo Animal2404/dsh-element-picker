@@ -456,12 +456,15 @@ if (picked !== null && picked.chipSource !== null) {
     picked.chipSource === 'element-picker',
     String(picked.chipSource),
   )
+  const label = picked.chipLabel ?? ''
   must(
     'the chip is compact — a short label, not a text wall',
-    (picked.chipLabel ?? '').length > 0 &&
-      (picked.chipLabel ?? '').length < 70 &&
-      picked.inner.trim().split(String.fromCharCode(10)).filter((line) => line.trim() !== '').length === 1,
-    JSON.stringify({ label: picked.chipLabel, inner: picked.inner }),
+    label.length > 0 &&
+      label.length < 70 &&
+      !picked.inner.includes('[选择器]') &&
+      !picked.inner.includes('[源码]') &&
+      !picked.inner.includes('[HTML]'),
+    JSON.stringify({ label, inner: picked.inner }),
   )
   if (draftSeed !== '') {
     must(
