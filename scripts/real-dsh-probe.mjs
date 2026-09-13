@@ -625,6 +625,31 @@ if (picked !== null && picked.chipSource !== null) {
 }
 
 
+// ------------------------------------------------- the chip's x must remove it
+// The control's slot is root-scoped, so the removal path has to resolve the
+// session the same way a pick does; when it did not, the x silently gave up.
+await step('the chip x removes the chip', async () => {
+  const before = await page.evaluate(() => document.querySelectorAll('[data-composer-chip="element-picker"]').length)
+  if (before === 0) {
+    skip('chip removal', 'no picker chip in the composer')
+    return
+  }
+
+  const zone = await page.evaluate(() => {
+    const chip = document.querySelector('[data-composer-chip="element-picker"]')
+    const box = chip.getBoundingClientRect()
+    return { x: Math.round(box.right - 6), y: Math.round(box.top + box.height / 2) }
+  })
+  await page.mouse.click(zone.x, zone.y)
+  await page.waitForTimeout(900)
+
+  const after = await page.evaluate(() => document.querySelectorAll('[data-composer-chip="element-picker"]').length)
+  must('clicking the x removes that chip', after === before - 1, `${before} -> ${after}`)
+  const removed = pluginLog.some((line) => line.includes('removed a chip via'))
+  must('the removal reported the route it used', removed, pluginLog.slice(-3).join(' | '))
+  await page.screenshot({ path: join(out, '11-chip-removed.png') })
+})
+
 // ------------------------------------------- collapsed sidebar must not overlap
 // The footer row holds DSH's own widget plus any plugin entries. In a collapsed
 // sidebar there is no horizontal room, so entries have to stack; offsetting them
