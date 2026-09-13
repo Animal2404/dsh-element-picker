@@ -203,6 +203,37 @@ test('a point that hit-tests to nothing falls back to the deepest box', () => {
   assert.deepEqual(picks, [target])
 })
 
+test('hovering fills the info card with the element facts', () => {
+  const { doc, win, target } = fixture()
+  target.classList.add('primary')
+  win.getComputedStyle = () => ({ color: 'rgb(207, 211, 214)', fontSize: '12px', fontFamily: '-apple-system, BlinkMacSystemFont' })
+  const picker = createPicker({ doc, win, onPick: () => {} })
+  picker.setActive(true)
+
+  const card = node(doc, 'info')
+  assert.equal(card.getAttribute('data-dsh-picker-visible'), null, 'hidden before hovering')
+
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
+  assert.equal(card.getAttribute('data-dsh-picker-visible'), 'true')
+  const cells = [...card.querySelectorAll('[data-dsh-picker-cell]')].map((cell) => cell.textContent)
+  assert.deepEqual(cells, ['button.primary', '44x30', 'Color', 'rgb(207, 211, 214)', 'Font', '12px -apple-system, BlinkMacSystemFont'])
+
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: -10, clientY: 5 }))
+  assert.equal(card.getAttribute('data-dsh-picker-visible'), null, 'cleared with the highlight')
+})
+
+test('the info card is gone once the selection ends', () => {
+  const { doc, win } = fixture()
+  const picker = createPicker({ doc, win, onPick: () => {} })
+  picker.setActive(true)
+  fire(win, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
+  const card = node(doc, 'info')
+  assert.equal(card.getAttribute('data-dsh-picker-visible'), 'true')
+
+  picker.setActive(false)
+  assert.equal(card.getAttribute('data-dsh-picker-visible'), null)
+})
+
 test('moving onto empty space clears the highlight', () => {
   const { doc, win, target } = fixture()
   doc.elementsFromPoint = (x) => (x < 0 ? [] : [target])

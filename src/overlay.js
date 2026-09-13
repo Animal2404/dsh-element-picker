@@ -25,6 +25,8 @@
  * Plain DOM (no framework): the plugin's React entry only calls `toggle()`.
  */
 
+import { hoverFacts } from './describe.js'
+
 /** Marker attribute on every node this overlay owns. */
 export const PICKER_MARKER = 'data-dsh-picker-ui'
 
@@ -93,8 +95,54 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   hint.setAttribute(PICKER_MARKER, 'hint')
   hint.textContent = HINT_TEXT
 
+  // The hover card: the same three facts ZCode shows beside the element under
+  // the pointer, so a pick can be judged before it is made.
+  const card = doc.createElement('div')
+  card.setAttribute(PICKER_MARKER, 'info')
+  const rows = [
+    ['info-title', 'info-size'],
+    ['info-color-label', 'info-color'],
+    ['info-font-label', 'info-font'],
+  ].map(([labelKey, valueKey], index) => {
+    const row = doc.createElement('div')
+    row.setAttribute('data-dsh-picker-row', String(index))
+    const label = doc.createElement('span')
+    label.setAttribute('data-dsh-picker-cell', labelKey)
+    const value = doc.createElement('span')
+    value.setAttribute('data-dsh-picker-cell', valueKey)
+    row.appendChild(label)
+    row.appendChild(value)
+    card.appendChild(row)
+    return { label, value }
+  })
+  rows[1].label.textContent = 'Color'
+  rows[2].label.textContent = 'Font'
+
+  root.appendChild(card)
   root.appendChild(highlight)
   root.appendChild(hint)
+
+  /**
+   * Fill the hover card and place it beside the element.
+   *
+   * @param {Element} element - Element under the pointer.
+   * @returns {void}
+   */
+  const paintCard = (element) => {
+    const facts = hoverFacts(element, win)
+    rows[0].label.textContent = facts.title
+    rows[0].value.textContent = facts.size
+    rows[1].value.textContent = facts.color
+    rows[2].value.textContent = facts.font
+    card.setAttribute('data-dsh-picker-visible', 'true')
+
+    const box = element.getBoundingClientRect()
+    const height = card.getBoundingClientRect?.().height ?? 0
+    const below = box.bottom + 8
+    const flip = height > 0 && below + height > (win.innerHeight ?? 0)
+    card.style.left = `${Math.max(8, Math.round(box.left))}px`
+    card.style.top = `${Math.round(flip ? Math.max(8, box.top - 8 - height) : below)}px`
+  }
 
   const host = doc.body ?? doc.documentElement
   host.appendChild(root)
@@ -112,6 +160,7 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   const paint = () => {
     if (current === null) {
       highlight.removeAttribute('data-dsh-picker-visible')
+      card.removeAttribute('data-dsh-picker-visible')
       return
     }
     const box = current.getBoundingClientRect()
@@ -120,6 +169,7 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     highlight.style.width = `${Math.round(box.width)}px`
     highlight.style.height = `${Math.round(box.height)}px`
     highlight.setAttribute('data-dsh-picker-visible', 'true')
+    paintCard(current)
   }
 
   /**
@@ -262,6 +312,7 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     if (!active) {
       current = null
       highlight.removeAttribute('data-dsh-picker-visible')
+      card.removeAttribute('data-dsh-picker-visible')
     }
     emit({ type: active ? 'enter' : 'leave' })
     return active

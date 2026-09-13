@@ -108,6 +108,15 @@ function overlayState(page) {
         width: Number.parseFloat(highlight.style.width),
         height: Number.parseFloat(highlight.style.height),
       },
+      infoVisible: (() => {
+        const card = document.querySelector('[data-dsh-picker-ui="info"]')
+        if (card === null) return false
+        return getComputedStyle(card).display !== 'none'
+      })(),
+      infoText: (() => {
+        const card = document.querySelector('[data-dsh-picker-ui="info"]')
+        return card === null ? '' : card.innerText.replace(/\s+/g, ' ').trim()
+      })(),
       hintVisible: (() => {
         const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
         if (hint === null) return false
@@ -189,6 +198,8 @@ async function runScenario(browser, mode, origin) {
   check('the registered component renders into the tool row', boot.slotButtons === 1, `slot buttons: ${boot.slotButtons}`)
   check('the overlay is mounted', boot.present === true)
   check('selection mode starts off', boot.active === 'false', String(boot.active))
+  check('the hint stays hidden until selecting', boot.hintVisible === false, String(boot.hintVisible))
+  check('the info card stays hidden until hovering', boot.infoVisible === false, String(boot.infoVisible))
   check('the harness runs the real React build', harness.reactVersion !== undefined, String(harness.reactVersion))
   check(
     'the overlay owns no button of its own',
@@ -226,6 +237,16 @@ async function runScenario(browser, mode, origin) {
   await page.waitForTimeout(150)
   const hovering = await overlayState(page)
   check('hovering shows the highlight', hovering.highlightVisible === true)
+  check('hovering shows the info card', hovering.infoVisible === true)
+  check(
+    'the info card carries the tag, size, colour and font',
+    /发送/.test(hovering.infoText) === false &&
+      /^button/.test(hovering.infoText) &&
+      /\d+x\d+/.test(hovering.infoText) &&
+      hovering.infoText.includes('Color') &&
+      hovering.infoText.includes('Font'),
+    hovering.infoText,
+  )
   check(
     'the highlight uses the high-contrast outline',
     hovering.highlightOutline === 'rgb(255, 138, 61)',

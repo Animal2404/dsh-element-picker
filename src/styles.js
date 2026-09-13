@@ -35,6 +35,49 @@ export const PICKER_CSS = `
 
 /* Top centre, not the bottom: parked above the composer it covered the very
    thing the user is typing into. */
+/* Hover card: tag and size on the first row, then Color and Font. */
+[data-dsh-picker-ui="info"] {
+  position: fixed;
+  display: none;
+  min-width: 180px;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(20, 22, 27, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: #e5e7eb;
+  font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  pointer-events: none;
+  z-index: 1;
+}
+
+[data-dsh-picker-ui="info"][data-dsh-picker-visible="true"] {
+  display: block;
+}
+
+[data-dsh-picker-ui="info"] [data-dsh-picker-row] {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+[data-dsh-picker-ui="info"] [data-dsh-picker-row="0"] {
+  font-weight: 600;
+}
+
+[data-dsh-picker-cell^="info-color-label"],
+[data-dsh-picker-cell^="info-font-label"] {
+  color: #8b93a1;
+}
+
+[data-dsh-picker-cell^="info-"]:not([data-dsh-picker-cell^="info-color-label"]):not([data-dsh-picker-cell^="info-font-label"]) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 [data-dsh-picker-ui="hint"] {
   position: fixed;
   left: 50%;

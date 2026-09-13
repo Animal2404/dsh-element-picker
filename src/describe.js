@@ -115,6 +115,36 @@ function rectLine(element, rect, scroll) {
 }
 
 /**
+ * The facts shown in the hover card while selecting, mirroring the small card
+ * ZCode floats beside the element under the pointer.
+ *
+ * @param {Element} element - Element under the pointer.
+ * @param {Window | undefined} win - Owning window, for computed styles.
+ * @returns {{ title: string, size: string, color: string, font: string }} Card rows.
+ */
+export function hoverFacts(element, win) {
+  const box = element.getBoundingClientRect?.()
+  const firstClass = element.classList?.item(0) ?? null
+  const tag = element.tagName.toLowerCase()
+
+  let style = null
+  try {
+    style = typeof win?.getComputedStyle === 'function' ? win.getComputedStyle(element) : null
+  } catch {
+    style = null
+  }
+
+  const family = style?.fontFamily ?? ''
+  const size = style?.fontSize ?? ''
+  return {
+    title: firstClass === null ? tag : `${tag}.${firstClass}`,
+    size: box === undefined || box === null ? '' : `${Math.round(box.width)}x${Math.round(box.height)}`,
+    color: style?.color ?? '',
+    font: size === '' ? '' : clip(`${size} ${family}`, FONT_LIMIT + 6),
+  }
+}
+
+/**
  * Shorten a repository path to its last two segments.
  *
  * The compact block is inserted into a chat composer, so a 70-character path
