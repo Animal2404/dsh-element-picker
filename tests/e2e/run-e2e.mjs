@@ -113,6 +113,16 @@ function overlayState(page) {
         if (hint === null) return false
         return getComputedStyle(hint).display !== 'none'
       })(),
+      hintRect: (() => {
+        const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
+        if (hint === null) return null
+        const box = hint.getBoundingClientRect()
+        return { top: Math.round(box.top), bottom: Math.round(box.bottom), height: Math.round(box.height) }
+      })(),
+      composerTop: (() => {
+        const card = document.querySelector('[data-composer-card]')
+        return card === null ? null : Math.round(card.getBoundingClientRect().top)
+      })(),
       slotButtons: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
       chips: [...document.querySelectorAll('[data-composer-chip]')].map((chip) => ({
         source: chip.getAttribute('data-composer-chip'),
@@ -196,6 +206,11 @@ async function runScenario(browser, mode, origin) {
   check('the tool-row control enters selection mode', active.active === 'true', String(active.active))
   check('the tool-row control shows its active state', active.slotPressed === 'true', String(active.slotPressed))
   check('the hint bar is visible in selection mode', active.hintVisible === true)
+  check(
+    'the hint sits above the composer instead of covering it',
+    active.hintRect !== null && active.composerTop !== null && active.hintRect.bottom <= active.composerTop,
+    JSON.stringify({ hint: active.hintRect, composerTop: active.composerTop }),
+  )
   await shot('02-selection-mode')
 
   // Hover outlines the element under the pointer.
