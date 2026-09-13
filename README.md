@@ -50,10 +50,27 @@ therefore a cascade, each step verified before the next is tried:
 | Path | How | Effect |
 | --- | --- | --- |
 | `paste` | the shell's internal `paste(text)` | inserts at the caret, keeps reference chips |
-| `dom` | `execCommand('insertText')`, then a synthetic `beforeinput` | Lexical applies it as a user edit |
-| `setDraft` | `setDraft(draft + text)` | last resort: chips are lost, caret moves to the end |
+| `dom` | a synthetic paste event, then `execCommand('insertText')`, then `beforeinput`, with the caret placed inside the editor first | Lexical applies it as a user edit |
+| `setDraft` | `setDraft(draft + text)` | last resort: the draft is rebuilt as plain text, so reference chips flatten to their text form |
 
-The path actually used is logged as `[dsh-element-picker] inserted via "…"`.
+The path actually used is logged, together with the reason every earlier path was
+skipped: `[dsh-element-picker] inserted via "…" (caret=placed routes[…])`.
+
+### What real DSH 0.1.5-rc.2 actually does (measured, not assumed)
+
+- `inputActions.paste` is **not exposed** to plugins, so the first path only
+  exists as a feature-detected placeholder for a build that does expose it.
+- A synthetic paste event is **refused** by the real editor (no listener claims
+  it), and `execCommand('insertText')` **flattens the newlines** of a multi-line
+  block, so the `dom` path does not win there.
+- `setDraft` therefore carries the insert. That is correct output-wise: the
+  fields land in order, one per line, and the text already in the draft
+  survives. The cost is that a reference chip already in the draft is flattened
+  to its plain-text form (`@path` stays as text, but is no longer a chip).
+- `document.execCommand('undo')` does **not** roll an `execCommand` insert back
+  in that editor, which is why no per-line DOM strategy is attempted: a partial
+  insert could not be undone. `setDraft(draft + text)` is idempotent, so it
+  repairs anything a failed DOM route left behind.
 
 ## Repository policy: cloud-only
 
@@ -84,14 +101,19 @@ Nothing in this repository is built, tested, or run on a developer machine.
 
 | Layer | Evidence |
 | --- | --- |
-| Selector, block, cascade, overlay logic | 37 `node:test` assertions, green in CI |
+| Selector, block, cascade, overlay logic | `node:test` suites, green in CI |
 | Built artifact contract | `verify-bundle` + the loader/registration suite, green in CI |
 | Real browser behaviour | Playwright run over the harness page, green in CI, screenshots archived |
-| Real DSH 0.1.5-rc.2 (Lexical composer, live slot) | not yet covered — requires a real DSH build |
+| **Real DSH 0.1.5-rc.2** | `.github/workflows/real-dsh.yml` boots the actual build on the runner, installs the plugin into a throwaway profile, and drives the real UI: the plugin mounts, the composer is confirmed to be a `contenteditable` (not a textarea), the session-scoped entry renders, selection mode and the highlight work on real elements, and a pick inserts the block into the real composer with the existing draft intact |
 
 The harness is a stub host, not DSH: it reproduces the DOM contract and the
-`slots`/`inputActions` surface the plugin consumes. Treat its result as
-"the picker's own logic works in a browser", not "it works in DSH".
+`slots`/`inputActions` surface the plugin consumes. The real-DSH job is what
+covers the gap, and its evidence (DOM dumps, screenshots, plugin console, server
+log) is uploaded on every run.
+
+Both jobs are diagnostics-first: a step that cannot be reached is reported with
+its reason rather than silently passing, and the run fails only for things that
+are unambiguously broken.
 
 ## Install
 
