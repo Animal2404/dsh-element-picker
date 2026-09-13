@@ -86,6 +86,84 @@ test('folding is idempotent, and the pill is its own toggle', () => {
   for (const line of lines) assert.equal(line.style.display, 'none')
 })
 
+test('one element folds once, however deep the app nests it', () => {
+  const doc = createDocument()
+  const panel = doc.createElement('div')
+  const section = doc.createElement('div')
+  // The application wraps a message in containers that also hold the rest of the
+  // section, and every wrapper starts with the block too.
+  const tail = doc.createElement('div')
+  tail.textContent = '已思考'
+  const lines = BLOCK_LINES.map((text) => {
+    const line = doc.createElement('p')
+    line.textContent = text
+    return line
+  })
+  const holder = doc.createElement('div')
+  for (const line of lines) holder.appendChild(line)
+
+  section.appendChild(holder)
+  section.appendChild(tail)
+  panel.appendChild(section)
+  doc.body.appendChild(panel)
+
+  assert.equal(foldTranscriptBlocks(doc), 1, 'a nested block folds exactly once')
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
+
+  // The wrappers are untouched: expanding shows the block inside the section, and
+  // the thinking entry never disappears with it.
+  const pill = doc.querySelectorAll(`[${PILL_MARKER}]`)[0]
+  assert.equal(holder.getAttribute(FOLD_MARKER), 'true')
+  assert.equal(section.getAttribute(FOLD_MARKER), null)
+  assert.equal(panel.getAttribute(FOLD_MARKER), null)
+  assert.equal(tail.style.display, '')
+
+  pill.dispatchEvent(createEvent('click'))
+  assert.equal(pill.getAttribute('aria-expanded'), 'true')
+  for (const line of lines) assert.equal(line.style.display, '')
+
+  // A second pass after the app re-renders must not stack another pill.
+  for (const line of lines) line.removeAttribute(FOLD_MARKER)
+  assert.equal(foldTranscriptBlocks(doc), 0)
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
+})
+
+test('a container that only starts with the block is left to its block', () => {
+  const doc = createDocument()
+  const section = doc.createElement('div')
+  // Rendered as one element per line plus a trailing note in the same section.
+  const block = doc.createElement('div')
+  block.textContent = BLOCK_LINES.slice(0, 4).join(String.fromCharCode(10))
+  const note = doc.createElement('div')
+  note.textContent = '上下文注入AGENTS.md'
+  section.appendChild(block)
+  section.appendChild(note)
+  doc.body.appendChild(section)
+
+  assert.equal(foldTranscriptBlocks(doc), 1)
+  assert.equal(block.getAttribute(FOLD_MARKER), 'true', 'the block itself is the fold')
+  assert.equal(section.getAttribute(FOLD_MARKER), null, 'the section is not')
+  assert.equal(note.style.display, '')
+})
+
+test('the pill label is one line: the element, not the whole block', () => {
+  const { doc } = fixture()
+  foldTranscriptBlocks(doc)
+  const label = doc.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent
+  assert.equal(label.includes(String.fromCharCode(10)), false, label)
+  assert.equal(label.includes('span "完全权限"'), true, label)
+  assert.equal(label.includes('[选择器]'), false, label)
+
+  // A compact one-line block shows the element and stops at the first field.
+  const compact = createDocument()
+  const one = compact.createElement('p')
+  one.textContent = '[元素] div.uV2eYG_input' + ' ' + String.fromCharCode(65372) + ' [选择器] div[data-composer-input="true"]' + ' ' + String.fromCharCode(65372) + ' [源码] …/InputBar.tsx'
+  compact.body.appendChild(one)
+  assert.equal(foldTranscriptBlocks(compact), 1)
+  assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent.includes('div.uV2eYG_input'), true)
+  assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent.includes('[选择器]'), false)
+})
+
 test('the composer is never folded', () => {
   const { doc } = fixture({ inComposer: true })
   assert.equal(foldTranscriptBlocks(doc), 0)
