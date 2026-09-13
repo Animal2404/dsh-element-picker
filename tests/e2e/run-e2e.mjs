@@ -131,6 +131,16 @@ function overlayState(page) {
         const line = document.getElementById('sent-line-6')
         return line === null ? '' : line.textContent.trim()
       })(),
+      hintRing: (() => {
+        const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
+        if (hint === null) return null
+        const style = getComputedStyle(hint, '::after')
+        return {
+          conic: (style.backgroundImage ?? '').includes('conic-gradient'),
+          composite: style.maskComposite || style.webkitMaskComposite || '',
+          playState: style.animationPlayState,
+        }
+      })(),
       infoVisible: (() => {
         const card = document.querySelector('[data-dsh-picker-ui="info"]')
         if (card === null) return false
@@ -148,6 +158,10 @@ function overlayState(page) {
         const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
         if (hint === null) return false
         return getComputedStyle(hint).display !== 'none'
+      })(),
+      hintTop: (() => {
+        const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
+        return hint === null ? null : Math.round(hint.getBoundingClientRect().top)
       })(),
       hintRect: (() => {
         const hint = document.querySelector('[data-dsh-picker-ui="hint"]')
