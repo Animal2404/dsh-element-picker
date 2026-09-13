@@ -105,7 +105,7 @@ test('the default block is ONE line with element, selector, and a short source',
   assert.match(block, /\[源码\] …\/skeleton\/InputBar\.tsx/)
   assert.equal(block.includes('[HTML]'), false, 'no HTML excerpt in the compact shape')
   assert.equal(block.includes('[XPath]'), false)
-  assert.equal(block.endsWith(\n'), true)
+  assert.equal(block.endsWith('\n'), true)
 })
 
 test('the compact block omits the source when no hook is mapped', () => {
