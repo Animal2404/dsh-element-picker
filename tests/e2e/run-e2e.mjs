@@ -485,8 +485,10 @@ async function runScenario(browser, mode, origin) {
     check('hovering the chip opens the preview', preview.previewVisible === true)
     check('the preview lists both elements', preview.previewRows === 2, String(preview.previewRows))
     check(
-      'the preview shows a summary, a tag line and the page',
-      preview.previewText.includes('元素') && /span|div|button/.test(preview.previewText) && preview.previewText.includes('DeepSeek'),
+      'the preview shows a summary, a tag line and the page it came from',
+      /发送/.test(preview.previewText) &&
+        /button/.test(preview.previewText) &&
+        preview.previewText.includes('DSH Element Picker'),
       preview.previewText.slice(0, 120),
     )
     check('the preview scrolls', preview.previewScrollable === true, String(preview.previewMaxHeight))

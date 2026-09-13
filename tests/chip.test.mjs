@@ -397,7 +397,7 @@ test('grouping removes every chip and inserts one carrying all their blocks', ()
   assert.equal(calls.inserted.length, 1)
   const payload = calls.inserted[0].ref
   assert.equal(calls.inserted[0].source, CHIP_SOURCE)
-  assert.equal(calls.inserted[0].label, `${GROUP_LABEL_PREFIX} 3 个元素`)
+  assert.equal(calls.inserted[0].label, '3 个元素')
   assert.equal(payload.startsWith('[元素组] 3 个界面元素'), true)
   for (const block of ['[元素] a', '[元素] b', '[元素] c']) assert.equal(payload.includes(block), true)
   // 1 header + 3 element blocks, each on its own line.
