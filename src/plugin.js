@@ -17,8 +17,16 @@ import { insertBlock } from './insert.js'
 import { createPicker } from './overlay.js'
 import { installStyles } from './styles.js'
 
-/** Composer tool-row slot their entry opts into. */
-export const SLOT = 'conversation.input.left'
+/**
+ * Slot the control opts into: the session header's right-aligned utilities.
+ *
+ * The entry sits before DSH's own open-in-app control (which registers at
+ * order -10), which is the top-right spot beside the session title.
+ */
+export const SLOT = 'conversation.session.header.utilities'
+
+/** Order within that list; lower sorts further left. */
+export const ENTRY_ORDER = -20
 
 /** Services this plugin's browser half consumes (declared in package.json too). */
 
@@ -292,7 +300,7 @@ function applyPicker(ctx) {
 
   ctx.slots.inject(SLOT, () =>
     ctx.slots.register(
-      { name: SLOT, id: ENTRY_ID, order: 100, label: '选择元素' },
+      { name: SLOT, id: ENTRY_ID, order: ENTRY_ORDER, label: '选择元素' },
       PickerButton,
     ),
   )

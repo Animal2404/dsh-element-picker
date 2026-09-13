@@ -364,7 +364,25 @@ if (state.composerEditable) {
   )
 }
 if (state.pickerSlotButton === 1) {
-  say('PASS  the composer-row entry rendered inside a live session')
+  const placement = await page.evaluate(() => {
+    const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+    if (control === null) return null
+    const box = control.getBoundingClientRect()
+    const header = control.closest('header')
+    return {
+      inHeader: header !== null,
+      headerRight: header === null ? null : Math.round(header.getBoundingClientRect().right),
+      x: Math.round(box.left),
+      viewport: innerWidth,
+    }
+  })
+  must('the control renders inside the session header', placement !== null && placement.inHeader === true, JSON.stringify(placement))
+  must(
+    'the control sits in the header's right-hand cluster',
+    placement !== null && placement.x > placement.viewport * 0.7,
+    JSON.stringify(placement),
+  )
+  say(`control placement: ${JSON.stringify(placement)}`)
 } else if (state.composerEditable) {
   must('the composer-row entry renders inside a live session', false, `found ${state.pickerSlotButton}`)
 } else {

@@ -214,9 +214,13 @@ async function runScenario(browser, mode, origin) {
 
   const boot = await overlayState(page)
   const harness = await harnessState(page)
-  check('the bundle registers into conversation.input.left', harness.injected === 'conversation.input.left', String(harness.injected))
+  check(
+    'the bundle registers into the session header utilities',
+    harness.injected === 'conversation.session.header.utilities',
+    String(harness.injected),
+  )
   check('the entry id is element-picker', harness.mounted?.id === 'element-picker', JSON.stringify(harness.mounted))
-  check('the registered component renders into the tool row', boot.slotButtons === 1, `slot buttons: ${boot.slotButtons}`)
+  check('the registered component renders into its slot host', boot.slotButtons === 1, `slot buttons: ${boot.slotButtons}`)
   check('the overlay is mounted', boot.present === true)
   check('selection mode starts off', boot.active === 'false', String(boot.active))
   check('the hint stays hidden until selecting', boot.hintVisible === false, String(boot.hintVisible))

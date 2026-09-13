@@ -11,11 +11,15 @@ different job (a browser extension), not this one.
 
 ## Behaviour
 
-1. One control, in the composer tool row (`conversation.input.left`): a pointer
-   icon that lights up while selection mode is on. The overlay owns no button of
-   its own — an earlier floating button duplicated the control and sat on top of
-   the composer's send button. While selecting, the chips' `×` is dimmed: clicks
-   belong to the picker until the selection ends.
+1. One control, at the top right of the session header
+   (`conversation.session.header.utilities`, sorting ahead of DSH's own
+   open-in-app control): a pointer icon with a slowly turning conic-gradient ring.
+   The control looks identical in every state — the ring is the state cue, and
+   `aria-pressed` carries it for assistive tech — because an earlier version
+   repainted its background while selecting, which read as a different button.
+   The overlay owns no button of its own: an earlier floating button duplicated
+   the control and sat on top of the composer's send button. While selecting, the
+   chips' `×` is dimmed: clicks belong to the picker until the selection ends.
 2. Click it: selection mode turns on, the hint bar appears, and hovering
    outlines the element that will be picked.
 3. Click an element: it becomes a chip in the composer (or the compact text line
