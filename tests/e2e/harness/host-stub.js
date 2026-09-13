@@ -132,7 +132,7 @@
       // A chip-capable host: the picker prefers inserting a reference chip, and
       // that path needs a session scope plus an input facade. Stubbed here so
       // the decision itself is covered without a real DSH.
-      var chips = { registered: null, inserted: [], name: null, projection: '' }
+      var chips = { registered: null, inserted: [], name: null, projection: '', occurrences: [] }
       window.__harness.chips = chips
 
       // Application-side listeners: if the picker leaks a click, these fire.
@@ -156,19 +156,22 @@
         extra.conversation = { input: { for: function () { return {
           // Like the real shell: the draft is a clipboard projection in which a
           // chip appears as its clipboard text.
-          state: { getSnapshot: function () { return { draftRev: 42, draft: chips.projection + composerInput().textContent } } },
+          state: { getSnapshot: function () {
+            return { draftRev: 42, draft: chips.projection + composerInput().textContent, occurrences: chips.occurrences.slice() }
+          } },
           setDraft: function (text) {
             chips.projection = ''
             composerInput().textContent = text
             return true
           },
-          // Mirrors the real consumeToken: drop the chip the span points at.
+          // Mirrors the real consumeToken: drop the chip the guard's span targets.
           consumeToken: function (guard) {
-            if (guard.kind !== 'span') return false
+            if (guard.kind !== 'span' || guard.span.draftRev !== 42) return false
             var all = document.querySelectorAll('[data-composer-chip]')
-            var chip = all[0]
-            if (chip === undefined) return false
-            chip.remove()
+            if (all.length === 0) return false
+            all[0].remove()
+            chips.inserted.shift()
+            chips.occurrences.shift()
             chips.projection = ''
             return true
           },
@@ -180,6 +183,7 @@
             chip.setAttribute('contenteditable', 'false')
             chip.textContent = ref.label
             composerInput().appendChild(chip)
+            chips.occurrences.push({ offset: chips.projection.length, length: ref.clipboardText.length })
             chips.projection += ref.clipboardText + ' '
             return true
           }

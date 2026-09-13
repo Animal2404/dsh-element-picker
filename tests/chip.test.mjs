@@ -192,13 +192,20 @@ test('the chip label names the tag and clips long text', () => {
 })
 
 test('a chip is located in the composer order, not just among our own', () => {
-  const { doc, chips } = fixture(1)
+  const doc = createDocument()
+  const input = doc.createElement('div')
+  input.setAttribute('data-composer-input', '')
+  doc.body.appendChild(input)
+
   const foreign = doc.createElement('span')
   foreign.setAttribute('data-composer-chip', 'reference')
-  doc.body.firstChild.insertBefore(foreign, chips[0])
+  input.appendChild(foreign)
+  const ours = doc.createElement('span')
+  ours.setAttribute('data-composer-chip', CHIP_SOURCE)
+  input.appendChild(ours)
 
   assert.equal(chipIndexOf(doc, foreign), 0, 'a user chip still counts towards the index')
-  assert.equal(chipIndexOf(doc, chips[0]), 1)
+  assert.equal(chipIndexOf(doc, ours), 1)
   assert.equal(chipIndexOf(doc, doc.createElement('span')), -1)
 })
 
