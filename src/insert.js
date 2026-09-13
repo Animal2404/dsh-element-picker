@@ -250,7 +250,8 @@ function insertViaDom({ text, doc, win }) {
       continue
     }
     if (verifyInserted(element, text)) {
-      return { ok: true, note: `caret=${caret ? 'placed' : 'unavailable'} ${name} applied` }
+      trace.push(`${name}:ok`)
+      return { ok: true, note: `caret=${caret ? 'placed' : 'unavailable'} routes[${trace.join(', ')}]` }
     }
     trace.push(`${name}:applied-but-no-text`)
   }

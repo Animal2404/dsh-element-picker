@@ -116,7 +116,7 @@ test('the dom path drives the editable and places a caret first', () => {
   assert.equal(result.ok, true)
   assert.equal(result.path, 'dom')
   assert.match(result.note, /caret=placed/)
-  assert.match(result.note, /execCommand applied/)
+  assert.equal(result.note.includes('routes[execCommand:ok]'), true, result.note)
   assert.equal(input.textContent.includes('[元素] button "发送"'), true)
   assert.equal(doc.selection.node, input, 'the caret must be inside the editor')
 })
@@ -140,8 +140,7 @@ test('a refused execCommand falls through to a synthetic paste event', () => {
 
   assert.equal(result.ok, true)
   assert.equal(result.path, 'dom')
-  assert.match(result.note, /paste-event applied/)
-  assert.match(result.note, /execCommand:refused/)
+  assert.equal(result.note.includes('routes[execCommand:refused, paste-event:ok]'), true, result.note)
 })
 
 test('the paste payload survives a constructor that drops clipboardData', () => {
@@ -161,7 +160,7 @@ test('the paste payload survives a constructor that drops clipboardData', () => 
   })
 
   assert.equal(result.path, 'dom')
-  assert.match(result.note, /paste-event applied/)
+  assert.equal(result.note.includes('routes[execCommand:refused, paste-event:ok]'), true, result.note)
 })
 
 test('beforeinput is the last DOM route', () => {
@@ -182,7 +181,11 @@ test('beforeinput is the last DOM route', () => {
 
   assert.equal(result.ok, true)
   assert.equal(result.path, 'dom')
-  assert.match(result.note, /beforeinput applied/)
+  assert.equal(
+    result.note.includes('routes[execCommand:refused, paste-event:refused, beforeinput:ok]'),
+    true,
+    result.note,
+  )
 })
 
 test('a dom route that reports success without changing the editor is rejected', () => {
