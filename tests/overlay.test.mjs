@@ -62,7 +62,7 @@ test('the overlay mounts a highlight and a hint, and nothing clickable', () => {
 
   assert.equal(node(doc, 'root') !== null, true)
   assert.equal(node(doc, 'highlight') !== null, true)
-  assert.match(node(doc, 'hint').textContent, /选择模式/)
+  assert.match(node(doc, 'hint').textContent, /连续选择/)
   assert.equal(node(doc, 'button'), null, 'the overlay must not own a button of its own')
   assert.equal(picker.isActive(), false)
   assert.equal(node(doc, 'root').getAttribute('data-dsh-picker-active'), 'false')

@@ -322,7 +322,7 @@ async function runScenario(browser, mode, origin) {
 
     // The × drops that chip, like ZCode's picked-element pill: a real click in
     // the chip's right-hand remove region.
-    const chipBox = await page.locator('[data-composer-chip="element-picker"]').boundingBox()
+    const chipBox = await page.locator('[data-composer-chip="element-picker"]').first().boundingBox()
     await page.mouse.click(chipBox.x + chipBox.width - 4, chipBox.y + chipBox.height / 2)
     await page.waitForTimeout(400)
     const afterRemove = await overlayState(page)
