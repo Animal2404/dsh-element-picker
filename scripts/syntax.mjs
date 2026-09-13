@@ -6,6 +6,7 @@
  * This turns that into an immediate, precisely located failure.
  */
 import { execFileSync } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
 import { readdir } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

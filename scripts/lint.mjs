@@ -93,7 +93,7 @@ function stripKeyframes(text) {
       if (inside <= 0) inside = 0
       continue
     }
-    if (/^@(?:-\w+-)?keyframes/.test(line.trim())) {
+    if (/^@(?:-\w+-)?keyframes/.test(line.trim())) {
       inside = Math.max(1, opens - closes)
       continue
     }
