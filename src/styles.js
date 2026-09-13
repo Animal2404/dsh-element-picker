@@ -19,15 +19,18 @@ export const PICKER_CSS = `
   pointer-events: none;
 }
 
-/* ZCode's selection box, in DSH's own brand blue rather than a hardcoded
-   accent: the fill is a 16% tint of the same colour. */
+/* ZCode's selection box. The colour comes from DSH's own palette — blue-500,
+   the vivid blue DSH uses for its primary surfaces — rather than a hardcoded
+   accent, with a 16% tint of the same colour as the fill.
+   (Note: --dsw-alias-brand-primary is near-white in this theme, so it is not the
+   right token here.) */
 [data-dsh-picker-ui="highlight"] {
   position: fixed;
   display: none;
   pointer-events: none;
-  background: rgba(77, 107, 254, 0.16);
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 16%, transparent);
-  outline: 2px solid var(--dsw-alias-brand-primary, #4d6bfe);
+  background: rgba(59, 130, 246, 0.16);
+  background: color-mix(in srgb, var(--dsw-static-blue-500, #3b82f6) 16%, transparent);
+  outline: 2px solid var(--dsw-static-blue-500, #3b82f6);
   outline-offset: -1px;
   border-radius: 2px;
 }

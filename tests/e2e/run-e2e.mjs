@@ -106,7 +106,7 @@ function overlayState(page) {
       brandOutline: (() => {
         // The same token the highlight is expected to use.
         const probe = document.createElement('div')
-        probe.style.outlineColor = 'var(--dsw-alias-brand-primary, #4d6bfe)'
+        probe.style.outlineColor = 'var(--dsw-static-blue-500, #3b82f6)'
         document.body.appendChild(probe)
         const value = getComputedStyle(probe).outlineColor
         probe.remove()
