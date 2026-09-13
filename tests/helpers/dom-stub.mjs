@@ -258,6 +258,20 @@ export function createElement(tag, doc) {
       if (other === node) return true
       return node.children.some((child) => child.contains?.(other) === true)
     },
+    querySelectorAll(selector) {
+      const found = []
+      const visit = (parent) => {
+        for (const child of parent.children ?? []) {
+          if (matchesSelector(child, selector)) found.push(child)
+          visit(child)
+        }
+      }
+      visit(node)
+      return found
+    },
+    querySelector(selector) {
+      return node.querySelectorAll(selector)[0] ?? null
+    },
     closest(selector) {
       let current = node
       while (current !== null) {
