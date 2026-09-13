@@ -363,6 +363,14 @@ if (state.composerEditable) {
     'the headless boot could not reach a workspace/session, so the composer stays inert',
   )
 }
+// The entry registers through the slot system once the session header mounts,
+// which is a moment after the session itself exists: wait for it like a user
+// would rather than sampling once.
+await page
+  .waitForFunction(() => document.querySelector('[data-dsh-picker-ui="slot-button"]') !== null, null, { timeout: 20000 })
+  .catch(() => {})
+state = await snapshot(page)
+
 if (state.pickerSlotButton === 1) {
   const placement = await page.evaluate(() => {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
@@ -384,9 +392,9 @@ if (state.pickerSlotButton === 1) {
   )
   say(`control placement: ${JSON.stringify(placement)}`)
 } else if (state.composerEditable) {
-  must('the composer-row entry renders inside a live session', false, `found ${state.pickerSlotButton}`)
+  must('the header entry renders once a session is live', false, `found ${state.pickerSlotButton}`)
 } else {
-  skip('the composer-row entry', 'the session-scoped slot has no session to render into')
+  skip('the header entry', 'the session-scoped slot has no session to render into')
 }
 
 
