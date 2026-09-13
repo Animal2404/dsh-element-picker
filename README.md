@@ -31,16 +31,19 @@ The pointer usually lands on a leaf — an icon's `<path>`, a label `<span>` —
 the ancestry is searched for the nearest thing that identifies itself:
 
 - a component hook (`data-composer-input`, `data-composer-card`, …),
-- an element with an `id`,
-- a control: `button`/`a[href]`/`input`/`select`/`textarea`/`select`/editable
-  regions, or an interactive ARIA role.
+- a control: `button`/`a[href]`/`input`/`select`/`textarea`/editable regions, or
+  an interactive ARIA role.
 
 Clicking an icon therefore picks the button it belongs to, and clicking inside
 the composer picks the editable itself. When the ancestry identifies nothing, the
 element under the pointer IS the answer — deliberately, because climbing past
-that is what makes a click inside a panel select the whole panel. (DSH marks
-whole panels with `data-phase`, so treating a marker like that as a target put a
-session's entire root in the highlight.)
+that is what makes a click inside a panel select the whole panel. Two measured
+traps shaped this rule: DSH marks whole panels with `data-phase` (a session root
+carries `data-phase="active"`), and it mounts the entire app under `div#root`, so
+accepting either a generic marker or *any* id as a target put a 907x815
+application-sized box in the highlight. Ids and markers still serve selector
+generation for an element that was already chosen; they just do not decide what
+gets picked.
 
 ## Inserted block
 
