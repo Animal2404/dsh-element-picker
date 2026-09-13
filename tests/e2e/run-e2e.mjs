@@ -142,6 +142,18 @@ function overlayState(page) {
         // The label excludes the injected remove affordance.
         label: (chip.textContent ?? '').replace('×', '').trim(),
       })),
+      slotRing: (() => {
+        const slot = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+        if (slot === null) return null
+        const style = getComputedStyle(slot, '::after')
+        return {
+          content: style.content,
+          conic: (style.backgroundImage ?? '').includes('conic-gradient'),
+          composite: style.maskComposite || style.webkitMaskComposite || '',
+          animation: style.animationName,
+          playState: style.animationPlayState,
+        }
+      })(),
       chipRemoveGlyph: (() => {
         const chip = document.querySelector('[data-composer-chip="element-picker"]')
         if (chip === null) return null
@@ -211,7 +223,27 @@ async function runScenario(browser, mode, origin) {
     `found ${boot.ownButtons} overlay button(s)`,
   )
   check('exactly one picker control exists', boot.slotButtons === 1, `found ${boot.slotButtons}`)
+  check(
+    'the control draws the conic border ring',
+    boot.slotRing !== null && boot.slotRing.content === '""' && boot.slotRing.conic === true,
+    JSON.stringify(boot.slotRing),
+  )
+  check(
+    'the ring is masked down to the border',
+    /exclude|destination-out/.test(boot.slotRing?.composite ?? ''),
+    String(boot.slotRing?.composite),
+  )
+  check(
+    'the ring is idle until hovered',
+    boot.slotRing?.playState === 'paused' && /rotate-hue/.test(boot.slotRing?.animation ?? ''),
+    JSON.stringify(boot.slotRing),
+  )
   await shot('01-boot')
+
+  // Hovering the control animates the ring.
+  await page.hover('[data-dsh-picker-ui="slot-button"]')
+  const ringHovered = await overlayState(page)
+  check('the ring animates while hovered', ringHovered.slotRing?.playState === 'running', JSON.stringify(ringHovered.slotRing))
 
   // The single control toggles the state, twice in a row.
   await page.click('[data-dsh-picker-ui="slot-button"]')

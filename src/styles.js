@@ -100,6 +100,69 @@ export const PICKER_CSS = `
   pointer-events: none;
 }
 
+/* Neon ring on the picker's control, adapted from the Uiverse
+   "ShadowShahriar" button: a conic gradient masked down to the border box only.
+   Two adaptations were needed. (1) It is scoped to our control instead of every
+   button. (2) The source geometry targets a large button (15px radius, 4px
+   ring); this control is a 28x28 icon button, so the ring is 2px and its radius
+   matches the control's own 6px, which is what keeps the ring hugging its edge.
+   The radius and width stay custom properties, so tuning is one value. */
+[data-dsh-picker-ui="slot-button"] {
+  --dsh-picker-ring-width: 2px;
+  --dsh-picker-ring-radius: 6px;
+  position: relative;
+  z-index: 2;
+}
+
+[data-dsh-picker-ui="slot-button"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--dsh-picker-ring-width);
+  border-radius: var(--dsh-picker-ring-radius);
+  background-image: conic-gradient(
+    #488cfb,
+    #29dbbc,
+    #ddf505,
+    #ff9f0e,
+    #e440bb,
+    #655adc,
+    #488cfb
+  );
+  -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  -webkit-mask-origin: content-box, padding-box;
+  mask-origin: content-box, padding-box;
+  -webkit-mask-clip: content-box, padding-box;
+  mask-clip: content-box, padding-box;
+  mask-composite: exclude;
+  -webkit-mask-composite: destination-out;
+  filter: hue-rotate(0);
+  animation: dsh-picker-rotate-hue linear 500ms infinite;
+  animation-play-state: paused;
+  pointer-events: none;
+}
+
+/* Running while hovered, and while the picker is actually selecting. */
+[data-dsh-picker-ui="slot-button"]:hover::after,
+[data-dsh-picker-ui="slot-button"][aria-pressed="true"]::after {
+  animation-play-state: running;
+}
+
+[data-dsh-picker-ui="slot-button"]:active {
+  --dsh-picker-ring-width: 3px;
+}
+
+@keyframes dsh-picker-rotate-hue {
+  to {
+    filter: hue-rotate(1turn);
+  }
+}
+
 /* The remove affordance on a picker chip, drawn as a pseudo-element on the chip's
    own span: the span is React's portal container, so a real injected child would
    sit outside React's managed tree and could be dropped by a re-render. The
