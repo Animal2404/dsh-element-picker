@@ -36,6 +36,10 @@ export const PICKER_CSS = `
 /* Top centre, not the bottom: parked above the composer it covered the very
    thing the user is typing into. */
 /* Hover card: tag and size on the first row, then Color and Font. */
+/* DSH's own design tokens (defined on body / body[data-ds-dark-theme] by
+   dsh-client-ui-theme) so the card follows the active theme instead of a
+   hardcoded dark surface; the literals are only fallbacks for a build without
+   them. */
 [data-dsh-picker-ui="info"] {
   position: fixed;
   display: none;
@@ -43,10 +47,10 @@ export const PICKER_CSS = `
   max-width: 300px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(20, 22, 27, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  color: #e5e7eb;
+  background: var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-3, rgba(20, 22, 27, 0.97)));
+  border: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.12));
+  box-shadow: var(--dsw-elevation-soft, 0 8px 24px rgba(0, 0, 0, 0.45));
+  color: var(--dsw-alias-label-primary, #e5e7eb);
   font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   pointer-events: none;
   z-index: 1;
@@ -69,7 +73,7 @@ export const PICKER_CSS = `
 
 [data-dsh-picker-cell^="info-color-label"],
 [data-dsh-picker-cell^="info-font-label"] {
-  color: #8b93a1;
+  color: var(--dsw-alias-label-secondary, #8b93a1);
 }
 
 [data-dsh-picker-cell^="info-"]:not([data-dsh-picker-cell^="info-color-label"]):not([data-dsh-picker-cell^="info-font-label"]) {
@@ -87,12 +91,12 @@ export const PICKER_CSS = `
   max-width: 70vw;
   padding: 6px 12px;
   border-radius: 8px;
-  background: rgba(22, 24, 29, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e5e7eb;
+  background: var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-3, rgba(22, 24, 29, 0.94)));
+  border: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.12));
+  color: var(--dsw-alias-label-primary, #e5e7eb);
   font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   white-space: nowrap;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--dsw-elevation-soft, 0 6px 20px rgba(0, 0, 0, 0.35));
   pointer-events: none;
 }
 
@@ -105,15 +109,15 @@ export const PICKER_CSS = `
   margin-left: 4px;
   padding: 0 2px;
   border-radius: 4px;
-  color: #9aa1ac;
+  color: var(--dsw-alias-label-tertiary, #9aa1ac);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
 
 [data-composer-chip="element-picker"]:hover::after {
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.16));
+  color: var(--dsw-alias-label-primary, #ffffff);
 }
 
 /* While selecting, clicks belong to the picker, so the × cannot act: it is shown

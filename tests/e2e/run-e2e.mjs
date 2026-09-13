@@ -113,6 +113,10 @@ function overlayState(page) {
         if (card === null) return false
         return getComputedStyle(card).display !== 'none'
       })(),
+      infoBackground: (() => {
+        const card = document.querySelector('[data-dsh-picker-ui="info"]')
+        return card === null ? '' : getComputedStyle(card).backgroundColor
+      })(),
       infoText: (() => {
         const card = document.querySelector('[data-dsh-picker-ui="info"]')
         return card === null ? '' : card.innerText.replace(/\s+/g, ' ').trim()
@@ -238,6 +242,11 @@ async function runScenario(browser, mode, origin) {
   const hovering = await overlayState(page)
   check('hovering shows the highlight', hovering.highlightVisible === true)
   check('hovering shows the info card', hovering.infoVisible === true)
+  check(
+    'the info card is painted with an opaque surface',
+    /^rgb/.test(hovering.infoBackground) && hovering.infoBackground.includes('rgba(0, 0, 0, 0)') === false,
+    hovering.infoBackground,
+  )
   check(
     'the info card carries the tag, size, colour and font',
     /发送/.test(hovering.infoText) === false &&

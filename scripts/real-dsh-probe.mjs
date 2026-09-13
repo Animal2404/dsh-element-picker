@@ -412,6 +412,29 @@ await step('picking an element in the real UI', async () => {
     }
   })
   say(`highlight over the composer card: ${JSON.stringify(highlight)}`)
+
+  // The hover card must be painted with DSH's own theme tokens, so it follows
+  // the active theme instead of carrying a hardcoded surface.
+  const themed = await page.evaluate(() => {
+    const card = document.querySelector('[data-dsh-picker-ui="info"]')
+    const probe = document.createElement('div')
+    probe.style.background = 'var(--dsw-alias-bg-overlay)'
+    document.body.appendChild(probe)
+    const tokenBackground = getComputedStyle(probe).backgroundColor
+    const labelToken = getComputedStyle(document.body).getPropertyValue('--dsw-alias-label-primary').trim()
+    probe.remove()
+    return {
+      cardBackground: card === null ? null : getComputedStyle(card).backgroundColor,
+      tokenBackground,
+      labelToken,
+    }
+  })
+  must(
+    'the hover card is painted with the DSH surface token',
+    themed.tokenBackground !== 'rgba(0, 0, 0, 0)' && themed.cardBackground === themed.tokenBackground,
+    JSON.stringify(themed),
+  )
+  must('the DSH label token is available to the overlay', themed.labelToken !== '', themed.labelToken)
   must('the highlight tracks a real DSH element', highlight.visible === 'true', JSON.stringify(highlight))
   await page.screenshot({ path: join(out, '07-hover.png') })
 
