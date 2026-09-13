@@ -23,7 +23,8 @@ different job (a browser extension), not this one.
    composer's send button. While selecting, the chips' `×` is dimmed: clicks
    belong to the picker until the selection ends.
 2. Click it: selection mode turns on, the hint bar appears, and hovering
-   outlines the element that will be picked.
+   outlines the element that will be picked — the same box ZCode draws, in DSH's
+   own brand blue (a 16% tint of it as the fill).
 3. Click an element: it becomes a chip in the composer (or the compact text line
    where chips are unavailable). **Selection mode stays on**, so elements can be
    picked one after another.

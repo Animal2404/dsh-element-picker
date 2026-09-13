@@ -102,6 +102,16 @@ function overlayState(page) {
       })(),
       highlightVisible: highlight !== null && highlight.getAttribute('data-dsh-picker-visible') === 'true',
       highlightOutline: highlight === null ? null : getComputedStyle(highlight).outlineColor,
+      highlightFill: highlight === null ? null : getComputedStyle(highlight).backgroundColor,
+      brandOutline: (() => {
+        // The same token the highlight is expected to use.
+        const probe = document.createElement('div')
+        probe.style.outlineColor = 'var(--dsw-alias-brand-primary, #4d6bfe)'
+        document.body.appendChild(probe)
+        const value = getComputedStyle(probe).outlineColor
+        probe.remove()
+        return value
+      })(),
       highlight: highlight === null ? null : {
         left: Number.parseFloat(highlight.style.left),
         top: Number.parseFloat(highlight.style.top),
@@ -348,9 +358,9 @@ async function runScenario(browser, mode, origin) {
     hovering.infoText,
   )
   check(
-    'the highlight uses the high-contrast outline',
-    hovering.highlightOutline === 'rgb(255, 138, 61)',
-    String(hovering.highlightOutline),
+    'the highlight is DSH brand-tinted and filled',
+    hovering.highlightOutline === hovering.brandOutline && hovering.highlightFill !== 'rgba(0, 0, 0, 0)',
+    JSON.stringify({ outline: hovering.highlightOutline, brand: hovering.brandOutline, fill: hovering.highlightFill }),
   )
   check(
     'the highlight matches the hovered element',
