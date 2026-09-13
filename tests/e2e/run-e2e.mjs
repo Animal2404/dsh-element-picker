@@ -223,7 +223,14 @@ async function runScenario(browser, mode, origin) {
 
   // Click inserts and leaves selection mode.
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
-  await page.waitForFunction(() => document.querySelector('[data-composer-input]').textContent.includes('[元素]'), null, { timeout: 5000 })
+  // The insert may land as a chip (chip mode) or as the compact text line.
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-composer-input]').textContent.includes('[元素]') ||
+      document.querySelector('[data-composer-chip]') !== null,
+    null,
+    { timeout: 5000 },
+  )
   const inserted = await overlayState(page)
   const afterInsert = await harnessState(page)
 
