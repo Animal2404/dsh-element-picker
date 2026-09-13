@@ -382,18 +382,23 @@ if (state.pickerSlotButton === 1) {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
     if (control === null) return null
     const box = control.getBoundingClientRect()
-    const header = control.closest('header')
     return {
-      inHeader: header !== null,
-      headerRight: header === null ? null : Math.round(header.getBoundingClientRect().right),
+      inSidebar: control.closest('[class*="sidebarCol"]') !== null,
+      nearBottom: box.top > innerHeight * 0.6,
       x: Math.round(box.left),
+      y: Math.round(box.top),
       viewport: innerWidth,
+      viewportHeight: innerHeight,
     }
   })
-  must('the control renders inside the session header', placement !== null && placement.inHeader === true, JSON.stringify(placement))
   must(
-    'the control sits in the right-hand header cluster',
-    placement !== null && placement.x > placement.viewport * 0.7,
+    'the control renders in the sidebar foot',
+    placement !== null && placement.inSidebar === true && placement.nearBottom === true,
+    JSON.stringify(placement),
+  )
+  must(
+    'the control sits on the left',
+    placement !== null && placement.x < placement.viewport * 0.3,
     JSON.stringify(placement),
   )
   say(`control placement: ${JSON.stringify(placement)}`)

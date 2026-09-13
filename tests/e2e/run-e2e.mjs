@@ -215,8 +215,8 @@ async function runScenario(browser, mode, origin) {
   const boot = await overlayState(page)
   const harness = await harnessState(page)
   check(
-    'the bundle registers into the session header utilities',
-    harness.injected === 'conversation.session.header.utilities',
+    'the bundle registers into the sidebar footer slot',
+    harness.injected === 'sidebar.footer.action',
     String(harness.injected),
   )
   check('the entry id is element-picker', harness.mounted?.id === 'element-picker', JSON.stringify(harness.mounted))
@@ -283,6 +283,11 @@ async function runScenario(browser, mode, origin) {
     'the ring keeps turning after the click',
     active.slotRing?.playState === 'running',
     JSON.stringify(active.slotRing),
+  )
+  check(
+    'the ring spins faster while selecting',
+    active.slotRing?.duration === '0.9s',
+    String(active.slotRing?.duration),
   )
   check('the hint bar is visible in selection mode', active.hintVisible === true)
   check(

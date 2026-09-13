@@ -90,7 +90,7 @@
    * @returns {void}
    */
   function mountEntry(component, options) {
-    var container = document.getElementById('slot-left')
+    var container = document.getElementById('slot-host')
     var props = {
       inputActions: inputActions,
       sessionId: 'ci-session',

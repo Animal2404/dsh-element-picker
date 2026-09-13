@@ -97,10 +97,10 @@ test('apply registers a fresh entry in the composer tool row', () => {
 
   exports.apply(ctx)
 
-  assert.deepEqual(injected, ['conversation.session.header.utilities'])
+  assert.deepEqual(injected, ['sidebar.footer.action'])
   assert.equal(registered.length, 1)
-  assert.equal(registered[0].options.name, 'conversation.session.header.utilities')
-  assert.equal(registered[0].options.order, -20, 'it must sort left of the open-in-app control')
+  assert.equal(registered[0].options.name, 'sidebar.footer.action')
+  assert.equal(registered[0].options.order, 100)
   assert.equal(registered[0].options.id, 'element-picker')
   assert.equal(registered[0].options.label, '选择元素')
   assert.equal(typeof registered[0].component, 'function')

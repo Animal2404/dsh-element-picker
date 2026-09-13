@@ -149,6 +149,11 @@ export const PICKER_CSS = `
   pointer-events: none;
 }
 
+/* Selecting is the working state, so the ring turns faster. */
+[data-dsh-picker-ui="slot-button"][aria-pressed="true"]::after {
+  animation-duration: 900ms;
+}
+
 [data-dsh-picker-ui="slot-button"]:active {
   --dsh-picker-ring-width: 3px;
 }

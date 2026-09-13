@@ -11,15 +11,17 @@ different job (a browser extension), not this one.
 
 ## Behaviour
 
-1. One control, at the top right of the session header
-   (`conversation.session.header.utilities`, sorting ahead of DSH's own
-   open-in-app control): a pointer icon with a slowly turning conic-gradient ring.
-   The control looks identical in every state — the ring is the state cue, and
-   `aria-pressed` carries it for assistive tech — because an earlier version
-   repainted its background while selecting, which read as a different button.
-   The overlay owns no button of its own: an earlier floating button duplicated
-   the control and sat on top of the composer's send button. While selecting, the
-   chips' `×` is dimmed: clicks belong to the picker until the selection ends.
+1. One control, in the sidebar foot beside Settings (`sidebar.footer.action`), so
+   it is present whether or not a session is open: a pointer icon with a slowly
+   turning conic-gradient ring. The ring is the state cue — it speeds up while
+   selecting — and the control itself looks identical in every state (an earlier
+   version repainted its background while selecting, which read as a different
+   button; `aria-pressed` carries the state for assistive tech). Because that
+   slot is root-scoped, the session and the input face are resolved from services
+   at pick time rather than from slot props. The overlay owns no button of its
+   own: an earlier floating button duplicated the control and sat on top of the
+   composer's send button. While selecting, the chips' `×` is dimmed: clicks
+   belong to the picker until the selection ends.
 2. Click it: selection mode turns on, the hint bar appears, and hovering
    outlines the element that will be picked.
 3. Click an element: it becomes a chip in the composer (or the compact text line
