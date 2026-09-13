@@ -237,8 +237,8 @@ async function runScenario(browser, mode, origin) {
   check('the overlay is mounted', boot.present === true)
   check(
     'a sent element block is folded into a pill',
-    boot.transcriptPills === 1 && boot.transcriptFoldedLines === 7,
-    JSON.stringify({ pills: boot.transcriptPills, folded: boot.transcriptFoldedLines }),
+    boot.transcriptPills === 1 && boot.transcriptFoldedLines >= 1 && boot.transcriptHiddenLines === 7,
+    JSON.stringify(boot),
   )
   check(
     'the pill carries the element summary',

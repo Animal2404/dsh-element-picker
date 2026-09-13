@@ -65,7 +65,7 @@ function foldBlock({ doc, first }) {
   // both shapes are collected the same way.
   const folded = [first]
   let sibling = first.nextElementSibling
-  while (sibling !== null && FIELD_RE.test((sibling.textContent ?? '').trim())) {
+  while (sibling !== null && sibling !== undefined && FIELD_RE.test((sibling.textContent ?? '').trim())) {
     folded.push(sibling)
     sibling = sibling.nextElementSibling
   }

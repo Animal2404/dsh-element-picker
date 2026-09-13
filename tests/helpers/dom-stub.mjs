@@ -276,6 +276,18 @@ export function createElement(tag, doc) {
     querySelector(selector) {
       return node.querySelectorAll(selector)[0] ?? null
     },
+    get nextElementSibling() {
+      const parent = node.parentElement
+      if (parent === null) return null
+      const index = parent.children.indexOf(node)
+      return index < 0 ? null : (parent.children[index + 1] ?? null)
+    },
+    get previousElementSibling() {
+      const parent = node.parentElement
+      if (parent === null) return null
+      const index = parent.children.indexOf(node)
+      return index <= 0 ? null : (parent.children[index - 1] ?? null)
+    },
     closest(selector) {
       let current = node
       while (current !== null) {
