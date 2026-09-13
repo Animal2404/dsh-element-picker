@@ -213,6 +213,12 @@ function overlayState(page) {
         const box = button.getBoundingClientRect()
         return { width: Math.round(box.width), height: Math.round(box.height), cursor: getComputedStyle(button).cursor }
       })(),
+      previewRowFont: (() => {
+        const row = document.querySelector('[data-dsh-picker-preview-summary]')
+        if (row === null) return null
+        const style = getComputedStyle(row)
+        return { size: style.fontSize, smoothing: style.webkitFontSmoothing }
+      })(),
       previewText: (() => {
         const panel = document.querySelector('[data-dsh-picker-ui="chip-preview"]')
         return panel === null ? '' : (panel.innerText ?? '').replace(/\s+/g, ' ').trim()
@@ -543,6 +549,13 @@ async function runScenario(browser, mode, origin) {
       'every preview row carries its own delete button',
       preview.previewRemoveButtons === preview.previewRows && preview.previewRows > 0,
       `${preview.previewRemoveButtons}/${preview.previewRows}`,
+    )
+    check(
+      'the preview text is a whole number of pixels with subpixel smoothing',
+      preview.previewRowFont !== null &&
+        Number.parseFloat(preview.previewRowFont.size) === Number.parseInt(preview.previewRowFont.size, 10) &&
+        preview.previewRowFont.smoothing === 'auto',
+      JSON.stringify(preview.previewRowFont),
     )
     check(
       'the row delete button is a clickable target',

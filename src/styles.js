@@ -276,7 +276,14 @@ export const PICKER_CSS = `
   border: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.12));
   box-shadow: var(--dsw-elevation-soft, 0 12px 32px rgba(0, 0, 0, 0.5));
   color: var(--dsw-alias-label-primary, #e5e7eb);
-  font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Integer sizes on purpose: a fractional size (12.5px) at devicePixelRatio 1 is
+     rasterised with fractional glyph metrics and reads as blurry, which is what
+     DSH's own text avoids by staying at 14px and above. */
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* The app turns on grayscale antialiasing, which makes text this small soft at
+     1x; our own panel opts back into subpixel rendering. */
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
   pointer-events: auto;
 }
 
@@ -306,7 +313,7 @@ export const PICKER_CSS = `
 [data-dsh-picker-preview-count] {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary, #cfd3d6);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -317,8 +324,8 @@ export const PICKER_CSS = `
   white-space: nowrap;
   text-overflow: ellipsis;
   text-align: right;
-  color: var(--dsw-alias-label-tertiary, #8b93a1);
-  font-size: 11px;
+  color: var(--dsw-alias-label-secondary, #cfd3d6);
+  font-size: 12px;
 }
 
 [data-dsh-picker-preview-item] {
@@ -344,7 +351,7 @@ export const PICKER_CSS = `
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--dsw-alias-label-primary, #e5e7eb);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 [data-dsh-picker-preview-selector] {
@@ -352,9 +359,9 @@ export const PICKER_CSS = `
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--dsw-alias-label-tertiary, #8b93a1);
+  color: var(--dsw-alias-label-secondary, #cfd3d6);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* The row's delete button: ZCode puts a trash glyph on every row of the list. */

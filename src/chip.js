@@ -828,14 +828,21 @@ export function watchChipPreview({ doc, win, payloadOf, onRemoveItem }) {
     return true
   }
 
+  // Snap to whole device pixels: on a scaled display (devicePixelRatio 1.25, 1.5)
+  // a fractional offset makes the browser resample the panel and its text.
+  const snap = (value) => {
+    const ratio = typeof win.devicePixelRatio === 'number' && win.devicePixelRatio > 0 ? win.devicePixelRatio : 1
+    return ratio > 1 ? Math.round(value * ratio) / ratio : Math.round(value)
+  }
+
   const place = (chip) => {
     const box = chip.getBoundingClientRect()
     const above = box.top > (win.innerHeight ?? 0) / 2
     panel.setAttribute('data-dsh-picker-visible', 'true')
     const own = panel.getBoundingClientRect()
     const maxLeft = Math.max(8, (win.innerWidth ?? 0) - own.width - 8)
-    panel.style.left = `${Math.min(Math.max(8, Math.round(box.left)), maxLeft)}px`
-    panel.style.top = `${Math.round(above ? Math.max(8, box.top - PREVIEW_GAP_PX - own.height) : box.bottom + PREVIEW_GAP_PX)}px`
+    panel.style.left = `${snap(Math.min(Math.max(8, box.left), maxLeft))}px`
+    panel.style.top = `${snap(above ? Math.max(8, box.top - PREVIEW_GAP_PX - own.height) : box.bottom + PREVIEW_GAP_PX)}px`
   }
 
   const show = (chip) => {
