@@ -131,6 +131,27 @@ const COMPACT_FIELDS = ['元素', '选择器', '源码']
 /** Separator the compact block writes between its fields. */
 const COMPACT_BAR = '｜'
 const LF = String.fromCharCode(10)
+/** Group payloads number their blocks with this prefix. */
+const GROUP_ITEM_RE = /（\d+）/
+
+/**
+ * Reduce one block to the fields that locate an element.
+ *
+ * @param {string} block - One element's block, compact or detailed.
+ * @returns {string} One line: element, selector, source.
+ */
+function compactBlock(block) {
+  const fields = new Map()
+  for (const line of String(block ?? '').split(LF)) {
+    for (const piece of line.split(COMPACT_BAR)) {
+      const match = /^\[([^\]]+)\]\s*(.*)$/.exec(piece.trim())
+      if (match !== null && !fields.has(match[1])) fields.set(match[1], match[2].trim())
+    }
+  }
+  if (fields.size === 0) return String(block ?? '').trim()
+  const parts = COMPACT_FIELDS.filter((name) => fields.has(name)).map((name) => `[${name}] ${fields.get(name)}`)
+  return parts.length === 0 ? String(block ?? '').trim() : parts.join(` ${COMPACT_BAR} `)
+}
 
 /**
  * The short form a chip shows in the draft.
@@ -138,25 +159,21 @@ const LF = String.fromCharCode(10)
  * A chip carries two texts: its clipboard text is what the composer renders and
  * what the draft holds if it is ever restored from text alone, and the codec's
  * `serialize` is the model form. Keeping the draft text short is what stops a
- * refresh from turning one pick into a page of locating detail in the composer.
+ * refresh from turning one pick into a page of locating detail in the composer —
+ * but it still has to name every element, because a draft restored from text is
+ * the only thing the model sees if the chip itself is gone.
  *
  * @param {unknown} ref - Chip reference: our block, as a string.
  * @returns {string} The draft text.
  */
 export function compactChipText(ref) {
   if (typeof ref !== 'string') return String(ref ?? '')
-  const fields = new Map()
-  for (const line of ref.split(LF)) {
-    for (const piece of line.split(COMPACT_BAR)) {
-      const match = /^\[([^\]]+)\]\s*(.*)$/.exec(piece.trim())
-      if (match !== null && !fields.has(match[1])) fields.set(match[1], match[2].trim())
-    }
-  }
-  if (fields.size === 0) return ref
-  // A group chip's first line already says everything the draft needs.
-  if (fields.has('元素组')) return `[元素组] ${fields.get('元素组')}`
-  const parts = COMPACT_FIELDS.filter((name) => fields.has(name)).map((name) => `[${name}] ${fields.get(name)}`)
-  return parts.length === 0 ? ref : parts.join(` ${COMPACT_BAR} `)
+  if (!GROUP_ITEM_RE.test(ref)) return compactBlock(ref)
+
+  const parts = ref.split(GROUP_ITEM_RE).map((part) => part.trim()).filter((part) => part !== '')
+  const header = parts[0].startsWith('[元素组]') ? parts.shift() : `[元素组] ${parts.length} 个界面元素`
+  const blocks = parts.map((block, index) => `（${index + 1}）${compactBlock(block)}`)
+  return [header, ...blocks].join(LF)
 }
 
 /**

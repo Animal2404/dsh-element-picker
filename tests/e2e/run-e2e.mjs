@@ -480,7 +480,9 @@ async function runScenario(browser, mode, origin) {
     check(
       'the chip keeps the draft to one compact line',
       afterInsert.chipPayloads.length > 0 &&
-        afterInsert.chipPayloads.every((text) => text.split(newline).length === 1 && text.includes('[XPath]') === false),
+        afterInsert.chipPayloads.every((text) =>
+          text.split(newline).every((line) => line.length < 200 && !/\[(?:XPath|位置|样式|属性|HTML)\]/.test(line)),
+        ),
       JSON.stringify(afterInsert.chipPayloads),
     )
     check(

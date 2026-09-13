@@ -488,8 +488,24 @@ test('the compact draft line keeps only what locates the element', () => {
   }
   // A compact block stays itself.
   assert.equal(compactChipText(BLOCK), BLOCK)
-  // A group chip's header line is already the short form.
-  assert.equal(compactChipText('[元素组] 3 个界面元素' + String.fromCharCode(10) + '（1）[元素] a'), '[元素组] 3 个界面元素')
+  // A group keeps every element, each one reduced to its locating fields.
+  const group = [
+    '[元素组] 2 个界面元素',
+    '',
+    '（1）[元素] button "发送"',
+    '[选择器] button.x',
+    '[XPath] /html/body/button',
+    '[HTML] <button>发送</button>',
+    '（2）[元素] span "工作区"',
+    '[选择器] span.y',
+  ].join(String.fromCharCode(10))
+  const compactGroup = compactChipText(group)
+  const groupLines = compactGroup.split(String.fromCharCode(10))
+  assert.equal(groupLines[0], '[元素组] 2 个界面元素', compactGroup)
+  assert.equal(groupLines[1], '（1）[元素] button "发送" ｜ [选择器] button.x', compactGroup)
+  assert.equal(groupLines[2], '（2）[元素] span "工作区" ｜ [选择器] span.y', compactGroup)
+  assert.equal(compactGroup.includes('[XPath]'), false, 'the model form is not in the draft')
+  assert.equal(compactGroup.includes('[HTML]'), false)
   // Anything that is not one of our blocks is left alone.
   assert.equal(compactChipText('普通文字'), '普通文字')
   assert.equal(compactChipText(undefined), '')
