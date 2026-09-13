@@ -112,7 +112,7 @@ test('the chip source is registered with a codec that expands the block', async 
   // The draft shows the compact line; the model form is the whole block.
   const draft = source.codec.clipboardText(BLOCK)
   assert.equal(draft.split(String.fromCharCode(10)).length, 1, draft)
-  assert.equal(draft.includes('[元素] button.primary "发送"'), true, draft)
+  assert.equal(draft.includes('[元素] button "发送"'), true, draft)
   assert.equal(draft.includes('[选择器]'), true, draft)
   assert.equal(draft.includes('[XPath]'), false, draft)
   assert.equal(draft.includes('[HTML]'), false, draft)
@@ -467,9 +467,27 @@ test('a group payload parses back into one preview row per element', () => {
 })
 
 test('the compact draft line keeps only what locates the element', () => {
-  assert.equal(compactChipText(BLOCK).startsWith('[元素] button.primary "发送"'), true)
-  assert.equal(compactChipText(BLOCK).includes('[选择器] button[aria-label="发送消息"]'), true)
-  assert.equal(compactChipText(BLOCK).includes('[源码]'), true)
+  const detailed = [
+    '[元素] button "发送"',
+    '[选择器] button.x',
+    '[XPath] /html/body/div[2]/button',
+    '[位置] 44x44 @ viewport(1032,688)',
+    '[样式] color #F9FAFB; display flex',
+    '[属性] aria-label="发送消息"',
+    '[源码] …/InputBar.tsx',
+    '[HTML] <button aria-label="发送消息">发送</button>',
+  ].join(String.fromCharCode(10))
+
+  const compact = compactChipText(detailed)
+  assert.equal(compact.split(String.fromCharCode(10)).length, 1, compact)
+  assert.equal(compact.startsWith('[元素] button "发送"'), true, compact)
+  assert.equal(compact.includes('[选择器] button.x'), true, compact)
+  assert.equal(compact.includes('[源码] …/InputBar.tsx'), true, compact)
+  for (const dropped of ['[XPath]', '[位置]', '[样式]', '[属性]', '[HTML]']) {
+    assert.equal(compact.includes(dropped), false, `${dropped} belongs to the model form only`)
+  }
+  // A compact block stays itself.
+  assert.equal(compactChipText(BLOCK), BLOCK)
   // A group chip's header line is already the short form.
   assert.equal(compactChipText('[元素组] 3 个界面元素' + String.fromCharCode(10) + '（1）[元素] a'), '[元素组] 3 个界面元素')
   // Anything that is not one of our blocks is left alone.
