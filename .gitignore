@@ -1,0 +1,9 @@
+# Built artifacts are produced exclusively by the cloud pipeline (see
+# .github/workflows/ci.yml). They ARE committed on purpose: a DSH client
+# plugin must ship a built lib/client.js for the host to serve, and nothing in
+# this repository is built, tested, or run on a developer machine.
+#
+# So lib/ is deliberately NOT ignored; only transient output is.
+node_modules/
+.e2e-out/
+*.log

@@ -1,0 +1,3 @@
+- insert:
+    - id: element-picker
+      name: '@dsh-external/dsh-element-picker'

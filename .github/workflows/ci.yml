@@ -1,0 +1,103 @@
+name: ci
+
+# Cloud-only repository: nothing here is built, tested, or run on a developer
+# machine. The workflow is the only producer of lib/ and the only source of
+# acceptance evidence.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: lint, build, verify, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Order matters: the bundle test loads lib/client.js, so build precedes test.
+      - name: Lint sources and manifest
+        run: node scripts/lint.mjs
+
+      - name: Build the client bundle
+        run: node scripts/build.mjs
+
+      - name: Verify the built artifact
+        run: node scripts/verify-bundle.mjs
+
+      - name: Test
+        run: node --test tests/*.test.mjs
+
+      - name: Summarize the artifact
+        run: |
+          set -euo pipefail
+          {
+            echo "### dsh-element-picker build"
+            echo
+            echo '```json'
+            cat lib/build-info.json
+            echo '```'
+            echo
+            echo "| file | bytes |"
+            echo "| --- | --- |"
+            for f in lib/client.js lib/index.js; do
+              echo "| $f | $(wc -c < "$f") |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload built plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-element-picker-lib
+          path: lib/
+
+  publish-lib:
+    name: publish built lib back to main
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Rebuild deterministically
+        run: node scripts/build.mjs
+
+      # A DSH plugin must ship a built lib/client.js for the host to serve, and
+      # local builds are not allowed, so the pipeline commits its own output.
+      - name: Commit lib/ when it changed
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain lib/)" ]; then
+            echo "lib/ is already current; nothing to publish"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/
+          git commit -m "chore: publish built lib from ${GITHUB_SHA::7} [skip ci]"
+          git push origin HEAD:main
