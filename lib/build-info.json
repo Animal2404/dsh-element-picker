@@ -2,8 +2,8 @@
   "name": "@dsh-external/dsh-element-picker",
   "version": "0.1.0",
   "moduleId": "@dsh-external/dsh-element-picker",
-  "commit": "65134fa237803aaee487e36f4c62b6e0cc39cc02",
-  "sourceHash": "0dc729feca247d34",
+  "commit": "155841d047a1d192aebb562739e8277751bf4f6a",
+  "sourceHash": "eefc1545c15cd8ab",
   "entry": "lib/client.js",
   "builtBy": "github-actions"
 }
