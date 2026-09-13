@@ -707,14 +707,44 @@ await step('a collapsed sidebar keeps the footer entries apart', async () => {
   say(`collapsed footer: ${JSON.stringify(layout)}`)
   await page.screenshot({ path: join(out, '10-collapsed-sidebar.png') })
 
-  // Put the sidebar back for the remaining steps.
+  // Put the sidebar back, and check the control returns promptly: a layout change
+  // produces no DOM mutation, so a mutation-only watch used to leave it stale
+  // until the next chat update.
   await page.evaluate(() => {
     const button = [...document.querySelectorAll('button')].find((candidate) =>
-      /expand sidebar/i.test(candidate.getAttribute('aria-label') ?? ''),
+      /expand sidebar|展开侧边栏|收起侧边栏/i.test(candidate.getAttribute('aria-label') ?? ''),
     )
     if (button !== undefined) button.click()
   })
-  await page.waitForTimeout(700)
+  await page.waitForTimeout(1200)
+
+  const restored = await page.evaluate(() => {
+    const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+    if (control === null) return null
+    const box = control.getBoundingClientRect()
+    const sidebar = document.querySelector('[class*="sidebarCol"]').getBoundingClientRect()
+    let row = null
+    for (const selector of ['.sbw-wrap', '[class*="footerActions"]', '[class*="footArea"]']) {
+      const candidate = document.querySelector(selector)
+      if (candidate === null) continue
+      const candidateBox = candidate.getBoundingClientRect()
+      if (candidateBox.width > 0 && candidateBox.height > 0) {
+        row = candidateBox
+        break
+      }
+    }
+    return {
+      w: Math.round(box.width),
+      h: Math.round(box.height),
+      insideSidebar: box.left >= sidebar.left - 1 && box.right <= sidebar.right + 1,
+      onRow: row !== null && box.top + box.height / 2 > row.top && box.top + box.height / 2 < row.bottom,
+    }
+  })
+  must(
+    'the control is back in place right after expanding',
+    restored !== null && restored.w > 0 && restored.h > 0 && restored.insideSidebar === true && restored.onRow === true,
+    JSON.stringify(restored),
+  )
 })
 
 // ------------------------------------------------- picking inside a menu
