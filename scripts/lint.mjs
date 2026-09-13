@@ -73,7 +73,36 @@ for (const [name, text] of texts) {
 const styleModule = texts.get('styles.js') ?? ''
 const cssMatch = /export const PICKER_CSS = `([\s\S]*?)`/.exec(styleModule)
 check(cssMatch !== null, 'src/styles.js: could not locate the PICKER_CSS template literal')
-const css = cssMatch === null ? '' : cssMatch[1]
+const rawCss = cssMatch === null ? '' : cssMatch[1]
+
+/**
+ * Drop @keyframes blocks before the selector checks: their steps (`from`, `to`,
+ * `50%`) are not selectors and must not be held to the namespacing rule.
+ *
+ * @param {string} text - Stylesheet text.
+ * @returns {string} The text without keyframe blocks.
+ */
+function stripKeyframes(text) {
+  const kept = []
+  let inside = 0
+  for (const line of text.split(String.fromCharCode(10))) {
+    const opens = (line.match(/[{]/g) ?? []).length
+    const closes = (line.match(/[}]/g) ?? []).length
+    if (inside > 0) {
+      inside += opens - closes
+      if (inside <= 0) inside = 0
+      continue
+    }
+    if (/^@(?:-\w+-)?keyframes/.test(line.trim())) {
+      inside = Math.max(1, opens - closes)
+      continue
+    }
+    kept.push(line)
+  }
+  return kept.join(String.fromCharCode(10))
+}
+
+const css = stripKeyframes(rawCss)
 check(!/!important/.test(css), 'src/styles.js: must not use !important (no fighting the app styles)')
 for (const line of css.split('\n')) {
   const trimmed = line.trim()
