@@ -382,7 +382,11 @@ if (state.pickerSlotButton === 1) {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
     if (control === null) return null
     const box = control.getBoundingClientRect()
-    const row = document.querySelector('.sbw-wrap')
+    let row = null
+    for (const selector of ['.sbw-wrap', '[class*="footerActions"]', '[class*="footArea"]']) {
+      row = document.querySelector(selector)
+      if (row !== null) break
+    }
     const rowBox = row === null ? null : row.getBoundingClientRect()
     return {
       inSidebar: control.closest('[class*="sidebarCol"]') !== null,
@@ -390,11 +394,12 @@ if (state.pickerSlotButton === 1) {
       x: Math.round(box.left),
       y: Math.round(box.top),
       row: rowBox === null ? null : {
+        cls: String(row.className).slice(0, 24),
         top: Math.round(rowBox.top),
         bottom: Math.round(rowBox.bottom),
         right: Math.round(rowBox.right),
       },
-      onBashRow:
+      onRow:
         rowBox !== null &&
         box.top + box.height / 2 > rowBox.top &&
         box.top + box.height / 2 < rowBox.bottom,
@@ -409,9 +414,11 @@ if (state.pickerSlotButton === 1) {
     placement !== null && placement.inSidebar === true && placement.nearBottom === true,
     JSON.stringify(placement),
   )
+  // The Bash widget is a user plugin, so a fresh CI profile anchors to the
+  // footer row itself; both are the same right-hand end of that row.
   must(
-    'the control sits on the Bash row, at its right end',
-    placement !== null && placement.onBashRow === true && placement.inRowRight === true,
+    'the control sits on the footer row, at its right end',
+    placement !== null && placement.onRow === true && placement.inRowRight === true,
     JSON.stringify(placement),
   )
   must(

@@ -100,7 +100,7 @@ test('apply registers a fresh entry in the composer tool row', () => {
   assert.deepEqual(injected, ['sidebar.footer.action'])
   assert.equal(registered.length, 1)
   assert.equal(registered[0].options.name, 'sidebar.footer.action')
-  assert.equal(registered[0].options.order, 100)
+  assert.equal(registered[0].options.order, 11, 'it must sort just after the Bash widget (order 10)')
   assert.equal(registered[0].options.id, 'element-picker')
   assert.equal(registered[0].options.label, '选择元素')
   assert.equal(typeof registered[0].component, 'function')
