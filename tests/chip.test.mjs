@@ -495,6 +495,9 @@ test('dropping a preview row removes that element and keeps the rest grouped', (
     consumeToken: () => {
       calls.consumed += 1
       chipsState = []
+      // A real consumeToken also takes the chip out of the editor, which is how
+      // removeChipElement verifies the edit landed.
+      chips[0].remove()
       return true
     },
     insertReference: (ref) => {
@@ -524,6 +527,7 @@ test('dropping the last preview row just removes the chip', () => {
     state: { getSnapshot: () => ({ draftRev: 5, draft: 'x'.repeat(20), occurrences: chipsState.slice() }) },
     consumeToken: () => {
       chipsState = []
+      chips[0].remove()
       return true
     },
     insertReference: () => {
