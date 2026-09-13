@@ -144,18 +144,12 @@ function snapshot(page) {
       pickerSlotButton: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
       buttons: [...document.querySelectorAll('button, [role="button"]')].map(describe),
       sessionRows: document.querySelectorAll('[data-session-id]').length,
-      header: (() => {
-        const header = document.querySelector('header')
-        const host = document.querySelector('[data-slot="conversation.session.header.utilities"]')
-        const actions = document.querySelector('[data-slot="conversation.session.header.actions"]')
-        return {
-          present: header !== null,
-          utilitiesHost: host !== null,
-          utilitiesChildren: host === null ? null : host.children.length,
-          utilitiesHtml: host === null ? null : host.innerHTML.slice(0, 140),
-          actionsChildren: actions === null ? null : actions.children.length,
-        }
-      })(),
+      headers: [...document.querySelectorAll('header')].map((header) => ({
+        cls: String(header.className).slice(0, 28),
+        text: (header.innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, 40),
+        slots: [...header.querySelectorAll('[data-slot]')].map((node) => node.getAttribute('data-slot')),
+      })),
+      allSlots: [...document.querySelectorAll('[data-slot]')].map((node) => node.getAttribute('data-slot')),
     }
   })
 }
