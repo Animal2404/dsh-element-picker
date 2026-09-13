@@ -161,21 +161,49 @@ function snapshot(page) {
  *
  * @param {import('playwright').Page} page - Page under test.
  * @param {string} pattern - Source of the label/text regex to match.
+ * @param {string} [selector] - Candidate elements.
  * @returns {Promise<string | null>} What was clicked, else null.
  */
-function domClick(page, pattern) {
-  return page.evaluate((source) => {
-    const match = new RegExp(source, 'i')
-    const buttons = [...document.querySelectorAll('button, [role="button"]')]
-    const target = buttons.find((button) => {
-      const label = button.getAttribute('aria-label') ?? ''
-      const text = (button.textContent ?? '').trim()
-      return match.test(label) || match.test(text)
-    })
-    if (target === undefined) return null
-    target.click()
-    return target.getAttribute('aria-label') ?? (target.textContent ?? '').trim()
-  }, pattern)
+function domClick(page, pattern, selector = 'button, [role="button"]') {
+  return page.evaluate(
+    ([source, candidates]) => {
+      const match = new RegExp(source, 'i')
+      const elements = [...document.querySelectorAll(candidates)]
+      const target = elements.find((element) => {
+        const label = element.getAttribute('aria-label') ?? ''
+        const text = (element.textContent ?? '').replace(/\s+/g, ' ').trim()
+        return match.test(label) || match.test(text)
+      })
+      if (target === undefined) return null
+      target.click()
+      return (
+        target.getAttribute('aria-label') ??
+        (target.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+      )
+    },
+    [pattern, selector],
+  )
+}
+
+/**
+ * Drive DSH's in-page workspace picker: enter a directory, then confirm it.
+ *
+ * @param {import('playwright').Page} page - Page under test.
+ * @param {(message: string) => void} log - Progress sink.
+ * @returns {Promise<boolean>} Whether an Open was clicked.
+ */
+async function chooseWorkspaceDirectory(page, log) {
+  const ROWS = 'button, [role="button"], [role="option"], li, a, [tabindex]'
+  for (const name of ['work', 'dsh-element-picker', 'actions-runner']) {
+    const entered = await domClick(page, `^${name}$`, ROWS)
+    if (entered === null) continue
+    log(`entered directory "${entered}"`)
+    await page.waitForTimeout(900)
+  }
+  const opened = await domClick(page, '^open$')
+  if (opened === null) return false
+  log('confirmed the workspace directory with Open')
+  return true
 }
 
 await rm(out, { recursive: true, force: true })
@@ -299,14 +327,28 @@ if (!state.composerEditable) {
       const workspace = await domClick(page, '^choose workspace$|^add workspace$|选择工作区')
       if (workspace !== null) {
         say(`clicked "${workspace}" (workspace picker)`)
-        await page.waitForTimeout(2500)
+        await page.waitForTimeout(2000)
         await page.screenshot({ path: join(out, '04-workspace-picker.png') })
+
+        const opened = await chooseWorkspaceDirectory(page, (message) => say(message))
+        if (!opened) skip('confirming a workspace directory', 'no Open affordance in the picker')
+        await page.waitForTimeout(3000)
+        await page.screenshot({ path: join(out, '05-workspace-chosen.png') })
+
         next = await snapshot(page)
+        if (!next.composerEditable) {
+          const again = await domClick(page, '^new session$|新建会话')
+          if (again !== null) {
+            say(`clicked "${again}" after choosing a workspace`)
+            await page.waitForTimeout(2500)
+            next = await snapshot(page)
+          }
+        }
       } else {
         skip('opening the workspace picker', 'no workspace affordance')
       }
     }
-    await writeFile(join(out, '05-after-session.json'), JSON.stringify(next, null, 2))
+    await writeFile(join(out, '06-after-session.json'), JSON.stringify(next, null, 2))
     say(`composer editable after the session attempt: ${next.composerEditable}`)
   })
 }
@@ -355,7 +397,7 @@ await step('picking an element in the real UI', async () => {
   })
   say(`highlight over the composer card: ${JSON.stringify(highlight)}`)
   must('the highlight tracks a real DSH element', highlight.visible === 'true', JSON.stringify(highlight))
-  await page.screenshot({ path: join(out, '06-hover.png') })
+  await page.screenshot({ path: join(out, '07-hover.png') })
 
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
   await page.waitForTimeout(1200)
@@ -363,7 +405,7 @@ await step('picking an element in the real UI', async () => {
     const composer = document.querySelector('[data-composer-input]')
     return composer === null ? null : composer.textContent
   })
-  await page.screenshot({ path: join(out, '07-after-pick.png') })
+  await page.screenshot({ path: join(out, '08-after-pick.png') })
 })
 
 say(`plugin console: ${pluginLog.length === 0 ? '(none)' : JSON.stringify(pluginLog, null, 2)}`)
