@@ -105,6 +105,24 @@ refusing the edit, or the codec source not registered — the picker falls back 
 a single compact text line, because a chip whose source has no codec would fail
 to serialize and block the send.
 
+### The group chip
+
+Picks merge as you go, so a second pick does not add a second pill: the composer
+keeps one chip labelled `N 个元素` that carries every element's block. Hovering it
+lists what it holds — one row per element (summary, tag · role, page title), the
+list scrolling when it is long, matching ZCode's picked-element popup.
+
+Two deletes, matching ZCode:
+
+| Control | Where | Effect |
+| --- | --- | --- |
+| trash glyph on a row | inside the hover list | drops **that** element: the group chip is rewritten from the elements that remain (`consumeToken`, then `insertReference` at the draft end), so the model never sees it |
+| `×` on the chip | the outer pill | clears **every** picked element in one click — one `consumeToken` per picker chip, last to first, and nothing is re-inserted |
+
+Both go through the same span-addressed removal as everything else, so a user's
+`@file` chips in the same draft are untouched. Dropping the last row simply
+removes the chip.
+
 The compact line (also what the fallback inserts):
 
 ```

@@ -14,14 +14,18 @@ import {
   parsePreviewItems,
   GROUP_LABEL_PREFIX,
   groupElementChips,
+  buildGroupPayload,
   CHIP_SOURCE,
   REMOVE_ZONE_PX,
   chipIndexOf,
   chipLabel,
+  chipPayloadOf,
   chipSpan,
   insertElementChip,
   registerChipSource,
+  removeAllChips,
   removeChipElement,
+  removePreviewItem,
   watchChipRemoval,
 } from '../src/chip.js'
 
@@ -437,8 +441,167 @@ test('a group payload parses back into one preview row per element', () => {
 
   const rows = parsePreviewItems(payload, 'DeepSeek Harness')
   assert.equal(rows.length, 2)
-  assert.deepEqual(rows[0], { summary: 'span "Gemini"', meta: 'span · role=treeitem', origin: 'DeepSeek Harness' })
-  assert.deepEqual(rows[1], { summary: 'div "zcode"', meta: 'div', origin: 'DeepSeek Harness' })
+  assert.deepEqual(
+    { summary: rows[0].summary, meta: rows[0].meta, origin: rows[0].origin },
+    { summary: 'span "Gemini"', meta: 'span · role=treeitem', origin: 'DeepSeek Harness' },
+  )
+  assert.deepEqual(
+    { summary: rows[1].summary, meta: rows[1].meta, origin: rows[1].origin },
+    { summary: 'div "zcode"', meta: 'div', origin: 'DeepSeek Harness' },
+  )
+  // Each row keeps its own raw block, so dropping a row can rebuild the rest.
+  assert.equal(rows[0].block.includes('[选择器] span.a'), true)
+  assert.equal(rows[0].block.includes('（2）'), false, 'a block is bare, without its number')
+  assert.equal(rows[1].block.includes('[选择器] div.b'), true)
+}
+
+test('the payload of a chip is read back from the published occurrences', () => {
+  const { doc, chips } = fixture(2)
+  const facade = {
+    state: {
+      getSnapshot: () => ({
+        draftRev: 3,
+        occurrences: [
+          { source: CHIP_SOURCE, offset: 0, length: 4, clipboardText: '[元素] a' },
+          { source: CHIP_SOURCE, offset: 9, length: 4, clipboardText: '[元素] b' },
+        ],
+      }),
+    },
+  }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+
+  assert.equal(chipPayloadOf({ ctx, sessionId: 's', chip: chips[0] }), '[元素] a')
+  assert.equal(chipPayloadOf({ ctx, sessionId: 's', chip: chips[1] }), '[元素] b')
+  // Nothing to read: no session, and no occurrence at that position.
+  assert.equal(chipPayloadOf({ ctx: {}, sessionId: 's', chip: chips[0] }), '')
+  assert.equal(chipPayloadOf({ ctx, sessionId: 's', chip: doc.createElement('span') }), '')
+})
+
+test('a payload is rebuilt with its elements renumbered and its label updated', () => {
+  const blocks = ['[元素] a', '[元素] b', '[元素] c']
+  const payload = buildGroupPayload(blocks)
+  assert.equal(payload.startsWith('[元素组] 3 个界面元素'), true)
+  assert.equal(payload.includes('（1）[元素] a'), true)
+  assert.equal(payload.includes('（3）[元素] c'), true)
+})
+
+test('dropping a preview row removes that element and keeps the rest grouped', () => {
+  const { doc, chips } = fixture(1)
+  const before = buildGroupPayload([BLOCK, '[元素] b', '[元素] c'])
+  let chipsState = [{ source: CHIP_SOURCE, offset: 0, length: 12, clipboardText: before }]
+  const calls = { consumed: 0, inserted: [] }
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 5, draft: 'x'.repeat(20), occurrences: chipsState.slice() }) },
+    consumeToken: () => {
+      calls.consumed += 1
+      chipsState = []
+      return true
+    },
+    insertReference: (ref) => {
+      calls.inserted.push(ref)
+      return true
+    },
+  }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+
+  const result = removePreviewItem({ ctx, sessionId: 's', chip: chips[0], index: 1, onEvent: () => {} })
+
+  assert.deepEqual(result, { removed: 1, remaining: 2 })
+  assert.equal(calls.consumed, 1, 'the group chip goes through consumeToken, never setDraft')
+  assert.equal(calls.inserted.length, 1)
+  const payload = calls.inserted[0].ref
+  assert.equal(calls.inserted[0].label, '2 个元素')
+  assert.equal(payload.includes('[元素] a'), true)
+  assert.equal(payload.includes('（2）[元素] c'), true, 'elements are renumbered from one')
+  assert.equal(payload.includes('[元素] b'), false, 'the dropped element is gone')
+})
+
+test('dropping the last preview row just removes the chip', () => {
+  const { doc, chips } = fixture(1)
+  let chipsState = [{ source: CHIP_SOURCE, offset: 0, length: 9, clipboardText: BLOCK }]
+  let inserted = 0
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 5, draft: 'x'.repeat(20), occurrences: chipsState.slice() }) },
+    consumeToken: () => {
+      chipsState = []
+      return true
+    },
+    insertReference: () => {
+      inserted += 1
+      return true
+    },
+  }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+
+  assert.deepEqual(removePreviewItem({ ctx, sessionId: 's', chip: chips[0], index: 0, onEvent: () => {} }), { removed: 1, remaining: 0 })
+  assert.equal(inserted, 0, 'nothing is re-inserted when no element is left')
+})
+
+test('dropping a row that does not exist changes nothing', () => {
+  const { doc, chips } = fixture(1)
+  let consumed = 0
+  const facade = {
+    state: {
+      getSnapshot: () => ({
+        draftRev: 5,
+        occurrences: [{ source: CHIP_SOURCE, offset: 0, length: 9, clipboardText: BLOCK }],
+      }),
+    },
+    consumeToken: () => {
+      consumed += 1
+      return true
+    },
+    insertReference: () => true,
+  }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+  const events = []
+  assert.equal(removePreviewItem({ ctx, sessionId: 's', chip: chips[0], index: 4, onEvent: (m) => events.push(m) }), null)
+  assert.equal(consumed, 0)
+  assert.match(events.join(' '), /cannot drop row 4/)
+})
+
+test('the outer delete clears every picked element in one call', () => {
+  const calls = []
+  let chips = [
+    { source: CHIP_SOURCE, offset: 0, length: 10, clipboardText: '[元素] a' },
+    { source: 'other-source', offset: 12, length: 8, clipboardText: 'not ours' },
+    { source: CHIP_SOURCE, offset: 22, length: 10, clipboardText: '[元素] b' },
+    { source: CHIP_SOURCE, offset: 34, length: 10, clipboardText: '[元素] c' },
+  ]
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 2, draft: 'x'.repeat(48), occurrences: chips.slice() }) },
+    consumeToken: (guard) => {
+      calls.push(guard.span)
+      const index = chips.findIndex((chip, position) => {
+        let detect = chip.offset
+        for (let i = 0; i < position; i += 1) detect -= chips[i].length - 1
+        return guard.span.start === detect
+      })
+      if (index < 0) return false
+      chips = chips.filter((_, position) => position !== index)
+      return true
+    },
+  }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+  const events = []
+
+  const result = removeAllChips({ ctx, sessionId: 's', onEvent: (message) => events.push(message) })
+
+  assert.deepEqual(result, { removed: 3, before: 3 })
+  assert.equal(calls.length, 3, 'every picker chip is consumed')
+  assert.equal(calls[0].start > calls[1].start && calls[1].start > calls[2].start, true, 'removed from the end backwards')
+  assert.equal(chips.length, 1, 'a foreign chip is left alone')
+  assert.equal(chips[0].source, 'other-source')
+  assert.match(events.join(' '), /cleared 3 of 3 picked chips/)
+})
+
+test('clearing with nothing picked reports rather than throws', () => {
+  const facade = { state: { getSnapshot: () => ({ draftRev: 1, occurrences: [] }) }, consumeToken: () => true }
+  const ctx = { sessions: { scope: () => ({}) }, conversation: { input: { for: () => facade } } }
+  const events = []
+  assert.deepEqual(removeAllChips({ ctx, sessionId: 's', onEvent: (m) => events.push(m) }), { removed: 0, before: 0 })
+  assert.match(events.join(' '), /no picked chips/)
+  assert.equal(removeAllChips({ ctx: {}, sessionId: 's', onEvent: () => {} }), null)
 })
 
 test('a single element payload is one row, and junk is none', () => {

@@ -11,7 +11,7 @@
  */
 import React from 'react'
 
-import { chipIndexOf, chipLabel, groupElementChips, insertElementChip, registerChipSource, removeChipElement, resolveInputBinding, watchChipPreview, watchChipRemoval } from './chip.js'
+import { chipLabel, chipPayloadOf, groupElementChips, insertElementChip, registerChipSource, removeAllChips, removePreviewItem, resolveInputBinding, watchChipPreview, watchChipRemoval } from './chip.js'
 import { buildElementBlock } from './describe.js'
 import { watchTranscript } from './transcript.js'
 import { insertBlock } from './insert.js'
@@ -430,18 +430,34 @@ function insertPickedElement(element, detailed = false) {
  * @returns {string} The payload, or '' when it cannot be read.
  */
 function chipPayload(chip) {
-  try {
-    const doc = chip.ownerDocument
-    const binding = resolveInputBinding(PICKER_STATE.ctx, resolveSessionId(PICKER_STATE.ctx, PICKER_STATE.sessionId), () => {})
-    const snapshot = typeof binding?.facade?.state?.getSnapshot === 'function' ? binding.facade.state.getSnapshot() : undefined
-    const occurrences = Array.isArray(snapshot?.occurrences) ? snapshot.occurrences : []
-    const index = chipIndexOf(doc, chip)
-    const occurrence = index >= 0 ? occurrences[index] : undefined
-    return typeof occurrence?.clipboardText === 'string' ? occurrence.clipboardText : ''
-  } catch (error) {
-    log('could not read a chip payload:', String(error))
-    return ''
-  }
+  return chipPayloadOf({
+    ctx: PICKER_STATE.ctx,
+    sessionId: resolveSessionId(PICKER_STATE.ctx, PICKER_STATE.sessionId),
+    chip,
+    onEvent: (message) => log(message),
+  })
+}
+
+/**
+ * Drop one row from the chip preview's list.
+ *
+ * The row's trash button comes here: the group chip is rewritten without that
+ * element, so the model never sees it.
+ *
+ * @param {Element} chip - The group chip the preview came from.
+ * @param {number} index - Which row was dropped.
+ * @returns {void}
+ */
+function dropPreviewItem(chip, index) {
+  const result = removePreviewItem({
+    ctx: PICKER_STATE.ctx,
+    sessionId: resolveSessionId(PICKER_STATE.ctx, PICKER_STATE.sessionId),
+    chip,
+    index,
+    onEvent: (message) => log(message),
+  })
+  log(result === null ? 'the preview row was not dropped' : `preview row dropped; ${result.remaining} element(s) left`)
+  if (PICKER_STATE.chipPreview !== null) PICKER_STATE.chipPreview.hide()
 }
 
 /**
@@ -468,25 +484,25 @@ function groupPickedChips() {
 }
 
 /**
- * Remove the chip a click landed on.
+ * Remove the picked elements a click landed on.
  *
- * @param {Element} chip - The chip to drop.
+ * The chip's × is the outer delete: one click clears the whole pile of picked
+ * elements, not only the pill it was clicked on.
+ *
+ * @param {Element} chip - The chip the click landed on.
  * @returns {void}
  */
 function removePickedChip(chip) {
-  const doc = chip.ownerDocument
-  // Same resolution as a pick: the control lives in a root-scoped slot, so the
-  // session comes from the service rather than from slot props.
-  const sessionId = resolveSessionId(PICKER_STATE.ctx, PICKER_STATE.sessionId)
-  const binding = resolveInputBinding(PICKER_STATE.ctx, sessionId, (message) => log(message))
-  const path = removeChipElement({
-    doc,
-    chip,
-    facade: binding === null ? null : binding.facade,
-    actx: binding === null ? null : binding.actx,
+  const result = removeAllChips({
+    ctx: PICKER_STATE.ctx,
+    sessionId: resolveSessionId(PICKER_STATE.ctx, PICKER_STATE.sessionId),
     onEvent: (message) => log(message),
   })
-  log(path === null ? 'the chip was not removed' : `removed a chip via "${path}"`)
+  log(
+    result === null
+      ? `the chip on <${chip.tagName === undefined ? '?' : String(chip.tagName).toLowerCase()}> was not removed`
+      : `cleared ${result.removed} of ${result.before} picked chips`,
+  )
   if (PICKER_STATE.chipPreview !== null) PICKER_STATE.chipPreview.hide()
 }
 
@@ -556,7 +572,12 @@ function applyPicker(ctx) {
   // untouched; this is how it renders).
   const stopWatchingTranscript = watchTranscript({ doc, win, onEvent: (message) => log(message) })
 
-  const chipPreview = watchChipPreview({ doc, win, payloadOf: (chip) => chipPayload(chip) })
+  const chipPreview = watchChipPreview({
+    doc,
+    win,
+    payloadOf: (chip) => chipPayload(chip),
+    onRemoveItem: (chip, index) => dropPreviewItem(chip, index),
+  })
   PICKER_STATE.chipPreview = chipPreview
 
   const stopWatchingChips = watchChipRemoval({

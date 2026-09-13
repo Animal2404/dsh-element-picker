@@ -135,7 +135,7 @@ export function resolveFacade(ctx, sessionId, note) {
  * @param {(message: string) => void} [options.onEvent] - Diagnostics sink.
  * @returns {string | null} 'chip' when a chip was inserted, else null.
  */
-export function insertElementChip({ ctx, sessionId, text, label, onEvent }) {
+export function insertElementChip({ ctx, sessionId, text, label, onEvent, atEnd = false }) {
   const note = (message) => {
     if (typeof onEvent === 'function') onEvent(message)
   }
@@ -151,10 +151,11 @@ export function insertElementChip({ ctx, sessionId, text, label, onEvent }) {
     }
 
     // `caretSpan()` is the shell's live selection in detect coordinates; without
-    // it, the end of the draft is the next best anchor.
+    // it, the end of the draft is the next best anchor. A rebuilt chip asks for
+    // the end explicitly: the caret may sit anywhere after the removal.
     let start = typeof snapshot?.draft === 'string' ? snapshot.draft.length : 0
     let end = start
-    if (typeof facade.caretSpan === 'function') {
+    if (atEnd !== true && typeof facade.caretSpan === 'function') {
       const caret = facade.caretSpan()
       if (typeof caret?.start === 'number' && typeof caret?.end === 'number') {
         start = caret.start
@@ -344,6 +345,100 @@ export function removeChipElement({ doc, facade, actx, chip, onEvent }) {
 export const GROUP_LABEL_PREFIX = '元素组'
 
 /**
+ * List the picker's own chips, read from the published occurrences.
+ *
+ * @param {object} facade - Input facade.
+ * @returns {{ snapshot: object | undefined, occurrences: object[], mine: { occurrence: object, index: number }[] }} State.
+ */
+function pickerChips(facade) {
+  const snapshot = typeof facade.state?.getSnapshot === 'function' ? facade.state.getSnapshot() : undefined
+  const occurrences = Array.isArray(snapshot?.occurrences) ? snapshot.occurrences : []
+  const mine = occurrences
+    .map((occurrence, index) => ({ occurrence, index }))
+    .filter((entry) => entry.occurrence.source === CHIP_SOURCE)
+  return { snapshot, occurrences, mine }
+}
+
+/**
+ * Remove the picker's chips, the last one first.
+ *
+ * Going backwards is what keeps the spans valid: removing the last chip cannot
+ * shift the coordinates of the ones before it.
+ *
+ * @param {object} options - Removal request.
+ * @param {object} options.facade - Input facade.
+ * @param {object | null} options.actx - Bail context, used when the facade has no consumeToken.
+ * @param {number} options.count - How many chips to remove.
+ * @param {string} options.what - Word for the diagnostics, e.g. 'grouping'.
+ * @param {(message: string) => void} options.note - Diagnostics sink.
+ * @returns {boolean} Whether every requested chip went away.
+ */
+function consumeSpans({ facade, actx, count, what, note }) {
+  for (let remaining = count; remaining > 0; remaining -= 1) {
+    const state = pickerChips(facade)
+    if (state.mine.length === 0) break
+    const target = state.mine[state.mine.length - 1]
+    const span = chipSpan(state.occurrences, target.index, state.snapshot?.draftRev)
+    if (span === null) {
+      note(`${what} stopped: a chip had no published occurrence`)
+      return false
+    }
+    let applied = false
+    try {
+      if (typeof facade.consumeToken === 'function') {
+        applied = facade.consumeToken({ kind: 'span', span }) === true
+      } else if (actx !== null && actx !== undefined && typeof actx.bail === 'function') {
+        applied = actx.bail(actx, 'slash/input-consume-token', { guard: { kind: 'span', span } }) === true
+      }
+    } catch (error) {
+      note(`${what} removal threw: ${String(error)}`)
+      return false
+    }
+    if (!applied) {
+      note(`${what} stopped: a chip refused to be removed`)
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * Clear every picked element out of the draft in one call.
+ *
+ * The group chip's × comes here: ZCode's outer delete drops the whole pile, not
+ * just the pill it was clicked on.
+ *
+ * @param {object} options - Clearing request.
+ * @param {object | undefined} options.ctx - Plugin (root) context.
+ * @param {string | undefined} options.sessionId - Session the composer belongs to.
+ * @param {(message: string) => void} [options.onEvent] - Diagnostics sink.
+ * @returns {{ removed: number, before: number } | null} How many went away.
+ */
+export function removeAllChips({ ctx, sessionId, onEvent }) {
+  const note = (message) => {
+    if (typeof onEvent === 'function') onEvent(message)
+  }
+  const binding = resolveInputBinding(ctx, sessionId, note)
+  if (binding === null) return null
+  const before = pickerChips(binding.facade).mine.length
+  if (before === 0) {
+    note('clearing found no picked chips')
+    return { removed: 0, before: 0 }
+  }
+  const ok = consumeSpans({
+    facade: binding.facade,
+    actx: binding.actx,
+    count: before,
+    what: 'clearing',
+    note,
+  })
+  if (!ok) return null
+  const after = pickerChips(binding.facade).mine.length
+  note(`cleared ${before - after} of ${before} picked chips`)
+  return { removed: before - after, before }
+}
+
+/**
  * Fold every picked element's chip in the draft into ONE group chip.
  *
  * The chips are removed from the end backwards (so the earlier spans stay valid)
@@ -366,14 +461,7 @@ export function groupElementChips({ ctx, sessionId, onEvent }) {
   const facade = binding.facade
   const actx = binding.actx
 
-  const ours = () => {
-    const snapshot = typeof facade.state?.getSnapshot === 'function' ? facade.state.getSnapshot() : undefined
-    const occurrences = Array.isArray(snapshot?.occurrences) ? snapshot.occurrences : []
-    const mine = occurrences
-      .map((occurrence, index) => ({ occurrence, index }))
-      .filter((entry) => entry.occurrence.source === CHIP_SOURCE)
-    return { snapshot, occurrences, mine }
-  }
+  const ours = () => pickerChips(facade)
 
   const first = ours()
   if (first.mine.length < 2) {
@@ -383,33 +471,8 @@ export function groupElementChips({ ctx, sessionId, onEvent }) {
   const blocks = first.mine.map((entry) => entry.occurrence.clipboardText)
   const total = blocks.length
 
-  // Remove from the last chip backwards: deleting the last one cannot shift the
-  // coordinates of the ones before it.
-  for (let remaining = total; remaining > 0; remaining -= 1) {
-    const state = ours()
-    if (state.mine.length === 0) break
-    const target = state.mine[state.mine.length - 1]
-    const span = chipSpan(state.occurrences, target.index, state.snapshot?.draftRev)
-    if (span === null) {
-      note('grouping stopped: a chip had no published occurrence')
-      return null
-    }
-    let applied = false
-    try {
-      if (typeof facade.consumeToken === 'function') {
-        applied = facade.consumeToken({ kind: 'span', span }) === true
-      } else if (actx !== null && actx !== undefined && typeof actx.bail === 'function') {
-        applied = actx.bail(actx, 'slash/input-consume-token', { guard: { kind: 'span', span } }) === true
-      }
-    } catch (error) {
-      note(`grouping removal threw: ${String(error)}`)
-      return null
-    }
-    if (!applied) {
-      note('grouping stopped: a chip refused to be removed')
-      return null
-    }
-  }
+  const removed = consumeSpans({ facade, actx, count: total, what: 'grouping', note })
+  if (!removed) return null
 
   // Insert the group chip where the draft ends.
   const after = ours()
@@ -418,7 +481,7 @@ export function groupElementChips({ ctx, sessionId, onEvent }) {
   for (const occurrence of occurrences) {
     detectLength -= Math.max(0, (occurrence.length ?? 1) - 1)
   }
-  const payload = [`[元素组] ${total} 个界面元素`, '', ...blocks.map((block, index) => `（${index + 1}）${block.trimEnd()}`)].join(String.fromCharCode(10)) + String.fromCharCode(10)
+  const payload = buildGroupPayload(blocks)
 
   const inserted = insertElementChip({
     ctx,
@@ -448,7 +511,7 @@ const PREVIEW_SUMMARY_RE = /^\[元素\]\s*/
  *
  * @param {string} text - The chip's payload.
  * @param {string} [origin] - Page title to show on every row.
- * @returns {{ summary: string, meta: string, origin: string }[]} Preview rows.
+ * @returns {{ summary: string, meta: string, origin: string, block: string }[]} Rows.
  */
 export function parsePreviewItems(text, origin = '') {
   const blocks = String(text ?? '')
@@ -467,9 +530,137 @@ export function parsePreviewItems(text, origin = '') {
     const attributes = lines.find((line) => line.startsWith('[属性]')) ?? ''
     const role = /role="([^"]+)"/.exec(attributes)
     const meta = role === null ? tag : `${tag} · role=${role[1]}`
-    rows.push({ summary, meta, origin })
+    rows.push({ summary, meta, origin, block })
   }
   return rows
+}
+
+/**
+ * The block a chip stands for, read back from the published occurrences.
+ *
+ * @param {object} options - Lookup request.
+ * @param {object | undefined} options.ctx - Plugin (root) context.
+ * @param {string | undefined} options.sessionId - Session the composer belongs to.
+ * @param {Element} options.chip - One of the picker's chips.
+ * @param {(message: string) => void} [options.onEvent] - Diagnostics sink.
+ * @returns {string} The payload, or '' when it cannot be read.
+ */
+export function chipPayloadOf({ ctx, sessionId, chip, onEvent }) {
+  const note = typeof onEvent === 'function' ? onEvent : () => {}
+  const binding = resolveInputBinding(ctx, sessionId, note)
+  if (binding === null) return ''
+  try {
+    const snapshot = typeof binding.facade.state?.getSnapshot === 'function' ? binding.facade.state.getSnapshot() : undefined
+    const occurrences = Array.isArray(snapshot?.occurrences) ? snapshot.occurrences : []
+    if (chip === null || chip === undefined || chip.ownerDocument === undefined) return ''
+    const index = chipIndexOf(chip.ownerDocument, chip)
+    const occurrence = index >= 0 ? occurrences[index] : undefined
+    return typeof occurrence?.clipboardText === 'string' ? occurrence.clipboardText : ''
+  } catch (error) {
+    note(`could not read a chip payload: ${String(error)}`)
+    return ''
+  }
+}
+
+/**
+ * Build the payload a group chip carries.
+ *
+ * @param {string[]} blocks - One locating block per element.
+ * @returns {string} The payload.
+ */
+export function buildGroupPayload(blocks) {
+  const newline = String.fromCharCode(10)
+  const body = blocks.map((block, index) => `（${index + 1}）${block.trimEnd()}`)
+  return [`[元素组] ${blocks.length} 个界面元素`, '', ...body].join(newline) + newline
+}
+
+/**
+ * Drop one element from a group chip.
+ *
+ * The whole chip is replaced by one that lists what is left, so the removal goes
+ * through the same consumeToken + insertReference pair every other edit uses;
+ * dropping the last element simply removes the chip.
+ *
+ * @param {object} options - Removal request.
+ * @param {object | undefined} options.ctx - Plugin (root) context.
+ * @param {string | undefined} options.sessionId - Session the composer belongs to.
+ * @param {Element} options.chip - The group chip.
+ * @param {number} options.index - Which row to drop.
+ * @param {(message: string) => void} [options.onEvent] - Diagnostics sink.
+ * @returns {{ removed: number, remaining: number } | null} What happened.
+ */
+export function removePreviewItem({ ctx, sessionId, chip, index, onEvent }) {
+  const note = typeof onEvent === 'function' ? onEvent : () => {}
+  const payload = chipPayloadOf({ ctx, sessionId, chip, onEvent: note })
+  const blocks = parsePreviewItems(payload).map((row) => row.block)
+  if (blocks.length === 0 || index < 0 || index >= blocks.length) {
+    note(`cannot drop row ${index}: the chip lists ${blocks.length} element(s)`)
+    return null
+  }
+  const remaining = blocks.filter((_, position) => position !== index)
+
+  const binding = resolveInputBinding(ctx, sessionId, note)
+  if (binding === null) return null
+  const removed = removeChipElement({
+    doc: chip.ownerDocument,
+    chip,
+    facade: binding.facade,
+    actx: binding.actx,
+    onEvent: note,
+  })
+  if (removed === null) {
+    note('the chip refused to be removed, so the row was left alone')
+    return null
+  }
+  if (remaining.length === 0) {
+    note('dropped the last element; the group chip is gone')
+    return { removed: 1, remaining: 0 }
+  }
+  const inserted = insertElementChip({
+    ctx,
+    sessionId,
+    text: buildGroupPayload(remaining),
+    label: `${remaining.length} 个元素`,
+    onEvent: note,
+    atEnd: true,
+  })
+  if (inserted === null) {
+    note(`dropped a row but could not re-insert the group (${remaining.length} left)`)
+    return null
+  }
+  note(`dropped one element; the group now carries ${remaining.length}`)
+  return { removed: 1, remaining: remaining.length }
+}
+
+/**
+ * The trash glyph DSH uses for its own delete controls, so a row's delete button
+ * looks native.
+ *
+ * @param {Document} doc - Owning document.
+ * @returns {Element} An inline SVG icon.
+ */
+function trashIcon(doc) {
+  const ns = 'http://www.w3.org/2000/svg'
+  const svg = doc.createElementNS(ns, 'svg')
+  svg.setAttribute('width', '14')
+  svg.setAttribute('height', '14')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('aria-hidden', 'true')
+  const path = doc.createElementNS(ns, 'path')
+  const d = [
+    'M5.43011 6.22849H6.7994V11.3909H5.43011V6.22849Z',
+    'M9.20056 6.22849H10.5699V11.3909H9.20056V6.22849Z',
+    'M8.07744 1.0625C8.72123 1.0625 9.19367 1.05499 9.63809 1.19933C10.4597 1.57918',
+    ' 10.9519 1.99442 11.407 2.44955L12.6575 3.70003H15.375V5.07036H0.625V3.70003H3.34252',
+    'L4.593 2.44955C5.04813 1.99442 5.5403 1.57918 6.3619 1.19933C6.80632 1.05499 7.27876 1.0625',
+    ' 7.92255 1.0625H8.07744ZM4.06299 6.91282V12.7132H11.937V6.91282H13.3073V14.0835H2.6927V6.91282',
+    'H4.06299Z',
+  ].join('')
+  path.setAttribute('d', d)
+  path.setAttribute('fill', 'currentColor')
+  svg.appendChild(path)
+  return svg
 }
 
 /** Delay before a preview hides, so the pointer can travel into it. */
@@ -486,9 +677,10 @@ const PREVIEW_HIDE_DELAY_MS = 160
  * @param {Document} options.doc - Owning document.
  * @param {Window} options.win - Owning window.
  * @param {() => string} options.payloadOf - Reads the payload of one chip.
- * @returns {() => void} Teardown.
+ * @param {(chip: Element, index: number) => void} [options.onRemoveItem] - Drops one row.
+ * @returns {{ hide: () => void, dispose: () => void }} Handle.
  */
-export function watchChipPreview({ doc, win, payloadOf }) {
+export function watchChipPreview({ doc, win, payloadOf, onRemoveItem }) {
   const host = doc.body ?? doc.documentElement
   let panel = null
   let hideTimer = null
@@ -509,7 +701,7 @@ export function watchChipPreview({ doc, win, payloadOf }) {
     if (panel === null) panel = build()
 
     panel.textContent = ''
-    for (const row of rows) {
+    for (const [index, row] of rows.entries()) {
       const item = doc.createElement('div')
       item.setAttribute('data-dsh-picker-preview-item', 'true')
 
@@ -525,9 +717,26 @@ export function watchChipPreview({ doc, win, payloadOf }) {
       origin.setAttribute('data-dsh-picker-preview-origin', 'true')
       origin.textContent = row.origin
 
-      item.appendChild(summary)
-      item.appendChild(meta)
-      if (row.origin !== '') item.appendChild(origin)
+      const text = doc.createElement('div')
+      text.setAttribute('data-dsh-picker-preview-text', 'true')
+      text.appendChild(summary)
+      text.appendChild(meta)
+      if (row.origin !== '') text.appendChild(origin)
+
+      const remove = doc.createElement('button')
+      remove.setAttribute('type', 'button')
+      remove.setAttribute('data-dsh-picker-ui', 'preview-remove')
+      remove.setAttribute('aria-label', '移除该元素')
+      remove.setAttribute('title', '移除该元素')
+      remove.appendChild(trashIcon(doc))
+      remove.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        if (typeof onRemoveItem === 'function') onRemoveItem(chip, index)
+      })
+
+      item.appendChild(text)
+      item.appendChild(remove)
       panel.appendChild(item)
     }
 

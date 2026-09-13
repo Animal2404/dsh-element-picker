@@ -292,11 +292,45 @@ export const PICKER_CSS = `
 }
 
 [data-dsh-picker-preview-item] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 4px 0;
+}
+
+[data-dsh-picker-preview-text] {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 [data-dsh-picker-preview-item] + [data-dsh-picker-preview-item] {
   border-top: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.08));
+}
+
+/* The row's delete button: ZCode puts a trash glyph on every row of the list. */
+[data-dsh-picker-ui="preview-remove"] {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #8b93a1);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+[data-dsh-picker-ui="preview-remove"]:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--dsw-alias-label-primary, #e5e7eb);
+}
+
+[data-dsh-picker-ui="preview-remove"]:active {
+  transform: scale(0.92);
 }
 
 [data-dsh-picker-preview-summary] {

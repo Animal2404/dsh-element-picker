@@ -202,6 +202,17 @@ function overlayState(page) {
         return getComputedStyle(panel).display !== 'none' && panel.getAttribute('data-dsh-picker-visible') === 'true'
       })(),
       previewRows: document.querySelectorAll('[data-dsh-picker-preview-item]').length,
+      previewRemoveButtons: (() => {
+        const rows = Array.from(document.querySelectorAll('[data-dsh-picker-preview-item]'))
+        if (rows.length === 0) return 0
+        return rows.filter((row) => row.querySelector('[data-dsh-picker-ui="preview-remove"]') !== null).length
+      })(),
+      previewRemoveCursor: (() => {
+        const button = document.querySelector('[data-dsh-picker-preview-item] [data-dsh-picker-ui="preview-remove"]')
+        if (button === null) return null
+        const box = button.getBoundingClientRect()
+        return { width: Math.round(box.width), height: Math.round(box.height), cursor: getComputedStyle(button).cursor }
+      })(),
       previewText: (() => {
         const panel = document.querySelector('[data-dsh-picker-ui="chip-preview"]')
         return panel === null ? '' : (panel.innerText ?? '').replace(/\s+/g, ' ').trim()
@@ -492,14 +503,45 @@ async function runScenario(browser, mode, origin) {
       preview.previewText.slice(0, 120),
     )
     check('the preview scrolls', preview.previewScrollable === true, String(preview.previewMaxHeight))
+    check(
+      'every preview row carries its own delete button',
+      preview.previewRemoveButtons === preview.previewRows && preview.previewRows > 0,
+      `${preview.previewRemoveButtons}/${preview.previewRows}`,
+    )
+    check(
+      'the row delete button is a clickable target',
+      preview.previewRemoveCursor !== null && preview.previewRemoveCursor.cursor === 'pointer',
+      JSON.stringify(preview.previewRemoveCursor),
+    )
     await shot('04b-chip-preview')
     await page.mouse.move(4, 4)
     await page.waitForTimeout(300)
 
-    // Leave the mode before exercising the ×: while selecting, clicks belong to
-    // the picker, so the × is deliberately inert.
+    // Leave the mode before exercising the delete controls: while selecting,
+    // clicks belong to the picker.
     await page.keyboard.press('Escape')
     await page.waitForTimeout(200)
+
+    // A row's trash button drops that one element and keeps the rest grouped.
+    await page.hover('[data-composer-chip="element-picker"]')
+    await page.waitForTimeout(400)
+    await page.click('[data-dsh-picker-preview-item] [data-dsh-picker-ui="preview-remove"]')
+    await page.waitForTimeout(500)
+    const afterRowRemove = await overlayState(page)
+    check(
+      'deleting a row leaves the other elements in one group chip',
+      afterRowRemove.chips.length === 1 && /^1 个元素$/.test(afterRowRemove.chips[0]?.label ?? ''),
+      JSON.stringify(afterRowRemove.chips),
+    )
+    await page.hover('[data-composer-chip="element-picker"]')
+    await page.waitForTimeout(400)
+    const afterRowRemovePreview = await overlayState(page)
+    check(
+      'the preview now lists only what is left',
+      afterRowRemovePreview.previewRows === 1,
+      String(afterRowRemovePreview.previewRows),
+    )
+    await shot('04d-chip-row-removed')
 
     check(
       'the chip draws a remove glyph',
@@ -507,13 +549,13 @@ async function runScenario(browser, mode, origin) {
       String(inserted.chipRemoveGlyph),
     )
 
-    // The × drops the group chip, like ZCode's picked-element pill.
+    // The × is the outer delete: one click clears every picked element.
     const chipBox = await page.locator('[data-composer-chip="element-picker"]').first().boundingBox()
     await page.mouse.click(chipBox.x + chipBox.width - 4, chipBox.y + chipBox.height / 2)
     await page.waitForTimeout(400)
     const afterRemove = await overlayState(page)
     check(
-      'clicking the × removed the group chip',
+      'clicking the × cleared every picked element',
       afterRemove.chips.length === 0,
       JSON.stringify(afterRemove.chips),
     )
