@@ -207,6 +207,8 @@ test('hovering fills the info card with the element facts', () => {
   const { doc, win, target } = fixture()
   target.classList.add('primary')
   win.getComputedStyle = () => ({ color: 'rgb(207, 211, 214)', fontSize: '12px', fontFamily: '-apple-system, BlinkMacSystemFont' })
+  // Point-aware hit testing, so moving off the element is observable.
+  doc.elementsFromPoint = (x) => (x < 0 ? [] : [target])
   const picker = createPicker({ doc, win, onPick: () => {} })
   picker.setActive(true)
 
