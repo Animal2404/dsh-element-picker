@@ -659,7 +659,8 @@ await step('a collapsed sidebar keeps the footer entries apart', async () => {
     const controlBox = box(control)
     const host = document.querySelector('[data-slot="sidebar.footer.action"]')
     const others = [...(host?.children ?? [])]
-      .filter((child) => child !== control && child.getBoundingClientRect().height > 0)
+      .filter((child) => child.closest('[data-dsh-picker-ui]') === null)
+      .filter((child) => child.getBoundingClientRect().height > 0)
       .map(box)
       .concat(
         [...document.querySelectorAll('.sbw-wrap, [class*="dshoq-wrap"]')]

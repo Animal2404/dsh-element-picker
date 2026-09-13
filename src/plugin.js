@@ -161,6 +161,9 @@ function PickerButton(props) {
       // sidebar should have.
       let neighbour = null
       for (const child of target.children) {
+        // Never treat our own anchor as the neighbour: in flow mode it is sized,
+        // and using it would make the placement depend on itself.
+        if (typeof child.closest === 'function' && child.closest('[data-dsh-picker-ui]') !== null) continue
         const childBox = child.getBoundingClientRect()
         if (childBox.width === 0 || childBox.height === 0) continue
         neighbour = childBox
