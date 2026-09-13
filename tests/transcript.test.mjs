@@ -130,6 +130,19 @@ test('one element folds once, however deep the app nests it', () => {
   assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
 })
 
+test('the label stops at the next field when the renderer uses spaces', () => {
+  const doc = createDocument()
+  const cell = doc.createElement('div')
+  cell.textContent = BLOCK_LINES.join(' ')
+  doc.body.appendChild(cell)
+
+  foldTranscriptBlocks(doc)
+  const label = doc.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent
+  assert.equal(label.includes('span "完全权限"'), true, label)
+  assert.equal(label.includes('[选择器]'), false, label)
+  assert.equal(label.includes('[XPath]'), false, label)
+})
+
 test('a container that only starts with the block is left to its block', () => {
   const doc = createDocument()
   const section = doc.createElement('div')
