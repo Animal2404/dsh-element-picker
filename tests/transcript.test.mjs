@@ -190,7 +190,9 @@ test("a block inside a table cell folds at the cell's own wrapper", () => {
   const row = doc.createElement('tr')
   const cell = doc.createElement('td')
   const wrapper = doc.createElement('span')
-  wrapper.textContent = BLOCK_LINES.slice(0, 3).join(String.fromCharCode(10))
+  // The table renders the block as one text node with the fields space-separated;
+  // the detail panel keeps the newlines.
+  wrapper.textContent = BLOCK_LINES.join(' ')
   cell.appendChild(wrapper)
   row.appendChild(cell)
   tbody.appendChild(row)
@@ -201,6 +203,21 @@ test("a block inside a table cell folds at the cell's own wrapper", () => {
   assert.equal(wrapper.getAttribute(FOLD_MARKER), 'true')
   assert.equal(cell.getAttribute(FOLD_MARKER), null, 'the cell itself is left alone')
   assert.equal(row.getAttribute(FOLD_MARKER), null)
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
+})
+
+test('a line the renderer collapsed onto one row still folds once', () => {
+  const { doc, lines } = fixture()
+  // Newlines become spaces in some views; the fields then sit on one line.
+  lines.forEach((line, index) => {
+    line.textContent = BLOCK_LINES[index] + ' '
+  })
+  const joined = doc.createElement('div')
+  joined.textContent = BLOCK_LINES.join(' ')
+  doc.body.appendChild(joined)
+
+  assert.equal(foldTranscriptBlocks(doc), 2, 'the joined copy folds as well')
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 2)
 })
 
 test('the composer is never folded', () => {
