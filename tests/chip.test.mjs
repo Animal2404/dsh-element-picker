@@ -453,7 +453,7 @@ test('a group payload parses back into one preview row per element', () => {
   assert.equal(rows[0].block.includes('[选择器] span.a'), true)
   assert.equal(rows[0].block.includes('（2）'), false, 'a block is bare, without its number')
   assert.equal(rows[1].block.includes('[选择器] div.b'), true)
-}
+})
 
 test('the payload of a chip is read back from the published occurrences', () => {
   const { doc, chips } = fixture(2)
