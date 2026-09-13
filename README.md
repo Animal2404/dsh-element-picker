@@ -169,6 +169,12 @@ gives a plugin no way to register how a sent message renders, so the fold wraps
 the already-rendered lines rather than changing the message — the text stays in
 the DOM and the model's view is untouched.
 
+One element is one pill, labelled with the element itself, and one click brings
+its whole block back. The fold only ever takes the innermost element whose text
+is nothing but block fields: a message wrapper (which also holds the thinking
+entry and the context injections) starts with the block too, and folding that
+hides the section and leaves a pill inside a pill.
+
 ## Insertion
 
 The composer is a Lexical `contenteditable` (`[data-composer-input]`), and the
