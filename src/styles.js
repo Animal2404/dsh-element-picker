@@ -255,26 +255,28 @@ export const PICKER_CSS = `
 }
 
 /* Hovering a picker chip lists what it holds, like ZCode's picked-element pill.
-   It takes pointer events so the list can actually be scrolled, and scrolls with
-   DSH's own scrollbar colours. */
+   The panel is a card: a header line naming the count and the page, then one row
+   per element with its own delete button. It takes pointer events, so the list can
+   be scrolled and the pointer can travel into it without the preview closing. */
 [data-dsh-picker-ui="chip-preview"] {
   position: fixed;
   display: none;
   z-index: 2147483001;
-  min-width: 220px;
-  max-width: 340px;
+  box-sizing: border-box;
+  min-width: 260px;
+  max-width: min(460px, 90vw);
   max-height: 40vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--dsh-scrollbar-thumb, rgba(255, 255, 255, 0.2)) transparent;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px;
+  border-radius: 12px;
   background: var(--dsw-alias-bg-layer-2, rgba(20, 22, 27, 0.98));
   border: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.12));
-  box-shadow: var(--dsw-elevation-soft, 0 8px 24px rgba(0, 0, 0, 0.45));
+  box-shadow: var(--dsw-elevation-soft, 0 12px 32px rgba(0, 0, 0, 0.5));
   color: var(--dsw-alias-label-primary, #e5e7eb);
-  font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   pointer-events: auto;
 }
 
@@ -291,11 +293,45 @@ export const PICKER_CSS = `
   background: var(--dsh-scrollbar-thumb, rgba(255, 255, 255, 0.2));
 }
 
+[data-dsh-picker-preview-head] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px 7px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.08));
+}
+
+[data-dsh-picker-preview-count] {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary, #cfd3d6);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+[data-dsh-picker-preview-origin] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  color: var(--dsw-alias-label-tertiary, #8b93a1);
+  font-size: 11px;
+}
+
 [data-dsh-picker-preview-item] {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+
+[data-dsh-picker-preview-item]:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.07));
 }
 
 [data-dsh-picker-preview-text] {
@@ -303,8 +339,22 @@ export const PICKER_CSS = `
   min-width: 0;
 }
 
-[data-dsh-picker-preview-item] + [data-dsh-picker-preview-item] {
-  border-top: 1px solid var(--dsw-elevation-stroke-color, rgba(255, 255, 255, 0.08));
+[data-dsh-picker-preview-summary] {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-primary, #e5e7eb);
+  font-size: 12.5px;
+}
+
+[data-dsh-picker-preview-selector] {
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-tertiary, #8b93a1);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
 }
 
 /* The row's delete button: ZCode puts a trash glyph on every row of the list. */
@@ -313,41 +363,33 @@ export const PICKER_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary, #8b93a1);
+  opacity: 0.75;
   cursor: pointer;
   pointer-events: auto;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+[data-dsh-picker-preview-item]:hover [data-dsh-picker-ui="preview-remove"],
+[data-dsh-picker-ui="preview-remove"]:focus-visible {
+  opacity: 1;
 }
 
 [data-dsh-picker-ui="preview-remove"]:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
-  color: var(--dsw-alias-label-primary, #e5e7eb);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.1));
+  color: var(--dsw-alias-state-error-primary, #f87171);
 }
 
 [data-dsh-picker-ui="preview-remove"]:active {
   transform: scale(0.92);
 }
 
-[data-dsh-picker-preview-summary] {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-[data-dsh-picker-preview-meta] {
-  color: var(--dsw-alias-label-secondary, #cfd3d6);
-  font-size: 12px;
-}
-
-[data-dsh-picker-preview-origin] {
-  color: var(--dsw-alias-label-tertiary, #8b93a1);
-  font-size: 11px;
-}
 
 /* The remove affordance on a picker chip, drawn as a pseudo-element on the chip's
    own span: the span is React's portal container, so a real injected child would

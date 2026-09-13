@@ -456,8 +456,21 @@ function dropPreviewItem(chip, index) {
     index,
     onEvent: (message) => log(message),
   })
-  log(result === null ? 'the preview row was not dropped' : `preview row dropped; ${result.remaining} element(s) left`)
-  if (PICKER_STATE.chipPreview !== null) PICKER_STATE.chipPreview.hide()
+  const preview = PICKER_STATE.chipPreview
+  if (result === null) {
+    log('the preview row was not dropped')
+    if (preview !== null) preview.hide()
+    return
+  }
+  log(`preview row dropped; ${result.remaining} element(s) left`)
+  if (preview === null) return
+  if (result.remaining === 0) {
+    preview.hide()
+    return
+  }
+  // Dropping a row rewrites the whole chip, so the open list is redrawn from the
+  // new one instead of being closed: the pointer stays put and sees what is left.
+  preview.refresh()
 }
 
 /**

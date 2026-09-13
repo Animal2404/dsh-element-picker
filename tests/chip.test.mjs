@@ -612,6 +612,23 @@ test('clearing with nothing picked reports rather than throws', () => {
   assert.equal(removeAllChips({ ctx: {}, sessionId: 's', onEvent: () => {} }), null)
 })
 
+test('a compact payload previews the element, not the whole line', () => {
+  const bar = String.fromCharCode(65372)
+  const line = [
+    '[元素] span.dpo-slider-value "关闭"',
+    '[选择器] .dpo-slider-wrap > span.dpo-slider-value',
+    '[源码] .../ui-conversation/src/client/skeleton/InputBar.tsx',
+  ].join(' ' + bar + ' ')
+
+  const rows = parsePreviewItems(line, 'DeepSeek Harness')
+  assert.equal(rows.length, 1)
+  // The summary is the element itself; the selector gets its own line.
+  assert.equal(rows[0].summary, 'span.dpo-slider-value "关闭"')
+  assert.equal(rows[0].selector, '.dpo-slider-wrap > span.dpo-slider-value')
+  assert.equal(rows[0].origin, 'DeepSeek Harness')
+  assert.equal(rows[0].meta, 'span')
+})
+
 test('a single element payload is one row, and junk is none', () => {
   const single = parsePreviewItems('[元素] button "发送"' + String.fromCharCode(10) + '[HTML] <button>')
   assert.equal(single.length, 1)

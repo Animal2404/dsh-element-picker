@@ -508,6 +508,32 @@ export function groupElementChips({ ctx, sessionId, onEvent }) {
 
 /** One row of the chip preview: what the user picked, in their words. */
 const PREVIEW_SUMMARY_RE = /^\[元素\]\s*/
+/** `[字段]` at the start of a line or of a `｜`-separated piece. */
+const PREVIEW_FIELD_RE = /^\[([^\]]+)\]\s*(.*)$/
+/** Separator the compact one-line block uses between fields. */
+const PREVIEW_BAR = '｜'
+const PREVIEW_LF = String.fromCharCode(10)
+
+/**
+ * Read the `[字段]` values out of one element block.
+ *
+ * Compact blocks put every field on one `｜`-separated line and detailed blocks
+ * give each its own line; both name the fields the same way, so one reader
+ * serves both.
+ *
+ * @param {string} block - One element block.
+ * @returns {Map<string, string>} Field name to value, the first occurrence winning.
+ */
+function previewFields(block) {
+  const fields = new Map()
+  for (const line of block.split(PREVIEW_LF)) {
+    for (const piece of line.split(PREVIEW_BAR)) {
+      const match = PREVIEW_FIELD_RE.exec(piece.trim())
+      if (match !== null && !fields.has(match[1])) fields.set(match[1], match[2].trim())
+    }
+  }
+  return fields
+}
 
 /**
  * Parse the block a chip stands for into preview rows.
@@ -529,16 +555,21 @@ export function parsePreviewItems(text, origin = '') {
 
   const rows = []
   for (const block of blocks) {
-    const lines = block.split(String.fromCharCode(10)).map((line) => line.trim())
+    const lines = block.split(PREVIEW_LF).map((line) => line.trim())
     const headline = lines.find((line) => PREVIEW_SUMMARY_RE.test(line))
     if (headline === undefined) continue
 
-    const summary = headline.replace(PREVIEW_SUMMARY_RE, '').trim()
+    // The summary comes from the field, never from the raw line: a compact block
+    // is one line that also carries the selector and the source path, and
+    // showing all of it is what made the first preview row unreadable.
+    const fields = previewFields(block)
+    const raw = fields.get('元素') ?? headline.replace(PREVIEW_SUMMARY_RE, '')
+    const summary = raw.trim()
     const tag = summary.split(/[\s.:#]/)[0] || 'element'
-    const attributes = lines.find((line) => line.startsWith('[属性]')) ?? ''
-    const role = /role="([^"]+)"/.exec(attributes)
+    const role = /role="([^"]+)"/.exec(fields.get('属性') ?? '')
     const meta = role === null ? tag : `${tag} · role=${role[1]}`
-    rows.push({ summary, meta, origin, block })
+    const selector = fields.get('选择器') ?? ''
+    rows.push({ summary, meta, selector, origin, block })
   }
   return rows
 }
@@ -672,74 +703,121 @@ function trashIcon(doc) {
 }
 
 /** Delay before a preview hides, so the pointer can travel into it. */
-const PREVIEW_HIDE_DELAY_MS = 160
+const PREVIEW_HIDE_DELAY_MS = 300
+/** Space between the chip and the panel it opens. */
+const PREVIEW_GAP_PX = 6
+const PREVIEW_SELECTOR = '[data-dsh-picker-ui="chip-preview"]'
 
 /**
  * Show a preview of what a picker chip holds when the pointer rests on it.
  *
  * ZCode's picked-element pill does the same: hovering it lists the elements, and
- * the list scrolls when there are many. The panel is ours, marked so the picker
- * ignores it, and it takes pointer events so it can actually be scrolled.
+ * the list scrolls when there are many. The panel is a card — one header line,
+ * then one row per element with its own delete button.
+ *
+ * The panel stays open while the pointer is inside it: without that, the list
+ * vanished the moment the pointer left the chip, and the row's delete button
+ * could never be reached.
  *
  * @param {object} options - Watch request.
  * @param {Document} options.doc - Owning document.
  * @param {Window} options.win - Owning window.
  * @param {() => string} options.payloadOf - Reads the payload of one chip.
  * @param {(chip: Element, index: number) => void} [options.onRemoveItem] - Drops one row.
- * @returns {{ hide: () => void, dispose: () => void }} Handle.
+ * @returns {{ hide: () => void, refresh: () => boolean, visible: () => boolean, dispose: () => void }} Handle.
  */
 export function watchChipPreview({ doc, win, payloadOf, onRemoveItem }) {
   const host = doc.body ?? doc.documentElement
   let panel = null
   let hideTimer = null
   let currentChip = null
+  let overPanel = false
+
+  const cancelHide = () => {
+    if (hideTimer !== null) {
+      win.clearTimeout(hideTimer)
+      hideTimer = null
+    }
+  }
 
   const build = () => {
     const element = doc.createElement('div')
     element.setAttribute('data-dsh-picker-ui', 'chip-preview')
     element.setAttribute('data-dsh-picker-visible', 'false')
     element.setAttribute('role', 'tooltip')
+    element.addEventListener('pointerover', () => {
+      overPanel = true
+      cancelHide()
+    })
+    element.addEventListener('pointerout', (event) => {
+      const to = event.relatedTarget
+      const stays = to !== null && typeof to.closest === 'function' && to.closest(PREVIEW_SELECTOR) !== null
+      if (!stays) {
+        overPanel = false
+        scheduleHide()
+      }
+    })
     host.appendChild(element)
     return element
   }
 
-  const show = (chip) => {
+  const render = (chip) => {
     const rows = parsePreviewItems(payloadOf(chip) ?? '', doc.title ?? '')
-    if (rows.length === 0) return
+    if (rows.length === 0) return false
     if (panel === null) panel = build()
 
     panel.textContent = ''
+    const head = doc.createElement('div')
+    head.setAttribute('data-dsh-picker-preview-head', 'true')
+
+    const count = doc.createElement('span')
+    count.setAttribute('data-dsh-picker-preview-count', 'true')
+    count.textContent = `${rows.length} 个元素`
+    head.appendChild(count)
+
+    // The page is the same for every row, so it belongs in the header once
+    // instead of being repeated under each element.
+    const origin = rows.find((row) => row.origin !== '')?.origin ?? ''
+    if (origin !== '') {
+      const where = doc.createElement('span')
+      where.setAttribute('data-dsh-picker-preview-origin', 'true')
+      where.textContent = origin
+      head.appendChild(where)
+    }
+    panel.appendChild(head)
+
     for (const [index, row] of rows.entries()) {
       const item = doc.createElement('div')
       item.setAttribute('data-dsh-picker-preview-item', 'true')
 
-      const summary = doc.createElement('div')
-      summary.setAttribute('data-dsh-picker-preview-summary', 'true')
-      summary.textContent = row.summary
-
-      const meta = doc.createElement('div')
-      meta.setAttribute('data-dsh-picker-preview-meta', 'true')
-      meta.textContent = row.meta
-
-      const origin = doc.createElement('div')
-      origin.setAttribute('data-dsh-picker-preview-origin', 'true')
-      origin.textContent = row.origin
-
       const text = doc.createElement('div')
       text.setAttribute('data-dsh-picker-preview-text', 'true')
+
+      const summary = doc.createElement('div')
+      summary.setAttribute('data-dsh-picker-preview-summary', 'true')
+      summary.setAttribute('title', row.summary)
+      summary.textContent = row.summary
       text.appendChild(summary)
-      text.appendChild(meta)
-      if (row.origin !== '') text.appendChild(origin)
+
+      const detail = row.selector !== '' ? row.selector : row.meta
+      if (detail !== '') {
+        const line = doc.createElement('div')
+        line.setAttribute('data-dsh-picker-preview-selector', 'true')
+        line.setAttribute('title', detail)
+        line.textContent = detail
+        text.appendChild(line)
+      }
 
       const remove = doc.createElement('button')
       remove.setAttribute('type', 'button')
       remove.setAttribute('data-dsh-picker-ui', 'preview-remove')
-      remove.setAttribute('aria-label', '移除该元素')
+      remove.setAttribute('aria-label', `移除第 ${index + 1} 个元素`)
       remove.setAttribute('title', '移除该元素')
       remove.appendChild(trashIcon(doc))
       remove.addEventListener('click', (event) => {
         event.preventDefault()
         event.stopPropagation()
+        cancelHide()
         if (typeof onRemoveItem === 'function') onRemoveItem(chip, index)
       })
 
@@ -747,50 +825,92 @@ export function watchChipPreview({ doc, win, payloadOf, onRemoveItem }) {
       item.appendChild(remove)
       panel.appendChild(item)
     }
+    return true
+  }
 
+  const place = (chip) => {
     const box = chip.getBoundingClientRect()
     const above = box.top > (win.innerHeight ?? 0) / 2
     panel.setAttribute('data-dsh-picker-visible', 'true')
-    const height = panel.getBoundingClientRect().height
-    panel.style.left = `${Math.max(8, Math.round(box.left))}px`
-    panel.style.top = `${Math.round(above ? Math.max(8, box.top - 8 - height) : box.bottom + 8)}px`
+    const own = panel.getBoundingClientRect()
+    const maxLeft = Math.max(8, (win.innerWidth ?? 0) - own.width - 8)
+    panel.style.left = `${Math.min(Math.max(8, Math.round(box.left)), maxLeft)}px`
+    panel.style.top = `${Math.round(above ? Math.max(8, box.top - PREVIEW_GAP_PX - own.height) : box.bottom + PREVIEW_GAP_PX)}px`
+  }
+
+  const show = (chip) => {
+    if (render(chip) !== true) {
+      hide()
+      return
+    }
+    cancelHide()
+    place(chip)
     currentChip = chip
   }
 
   const scheduleHide = () => {
-    if (hideTimer !== null) win.clearTimeout(hideTimer)
+    cancelHide()
     hideTimer = win.setTimeout(() => {
+      hideTimer = null
       if (panel !== null) panel.setAttribute('data-dsh-picker-visible', 'false')
       currentChip = null
     }, PREVIEW_HIDE_DELAY_MS)
   }
 
+  const hide = () => {
+    cancelHide()
+    if (panel !== null) panel.setAttribute('data-dsh-picker-visible', 'false')
+    currentChip = null
+    overPanel = false
+  }
+
+  const isVisible = () => panel !== null && panel.getAttribute('data-dsh-picker-visible') === 'true'
+
+  /**
+   * Re-read the chip the draft holds now and redraw the open preview.
+   *
+   * Dropping a row replaces the whole chip, so the open list is redrawn from the
+   * new one instead of being closed — the pointer never has to leave and come
+   * back to see what is left.
+   *
+   * @returns {boolean} Whether a preview is on screen afterwards.
+   */
+  const refresh = () => {
+    const chip = doc.querySelector(CHIP_SELECTOR)
+    if (chip === null) {
+      hide()
+      return false
+    }
+    show(chip)
+    return isVisible()
+  }
+
   const owns = (node) => {
     if (node === null || typeof node.closest !== 'function') return false
-    return node.closest(CHIP_SELECTOR) !== null || node.closest('[data-dsh-picker-ui="chip-preview"]') !== null
+    return node.closest(CHIP_SELECTOR) !== null || node.closest(PREVIEW_SELECTOR) !== null
   }
 
   const onOver = (event) => {
     const node = event.target
     if (node === null || typeof node.closest !== 'function') return
+    if (node.closest(PREVIEW_SELECTOR) !== null) {
+      overPanel = true
+      cancelHide()
+      return
+    }
     const chip = node.closest(CHIP_SELECTOR)
     if (chip !== null) {
-      if (hideTimer !== null) win.clearTimeout(hideTimer)
+      cancelHide()
       if (chip !== currentChip) show(chip)
       return
     }
-    if (node.closest('[data-dsh-picker-ui="chip-preview"]') === null) scheduleHide()
+    if (!overPanel) scheduleHide()
   }
 
   const onOut = (event) => {
     if (!owns(event.target)) return
+    if (overPanel) return
     scheduleHide()
-  }
-
-  const hide = () => {
-    if (hideTimer !== null) win.clearTimeout(hideTimer)
-    if (panel !== null) panel.setAttribute('data-dsh-picker-visible', 'false')
-    currentChip = null
   }
 
   const target = typeof win.addEventListener === 'function' ? win : doc
@@ -798,11 +918,14 @@ export function watchChipPreview({ doc, win, payloadOf, onRemoveItem }) {
   target.addEventListener('pointerout', onOut, true)
   return {
     hide,
+    refresh,
+    visible: isVisible,
     dispose: () => {
       target.removeEventListener('pointerover', onOver, true)
       target.removeEventListener('pointerout', onOut, true)
-      if (hideTimer !== null) win.clearTimeout(hideTimer)
+      cancelHide()
       if (panel !== null) panel.remove()
+      panel = null
     },
   }
 }

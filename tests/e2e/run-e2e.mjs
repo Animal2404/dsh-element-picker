@@ -550,8 +550,21 @@ async function runScenario(browser, mode, origin) {
       JSON.stringify(preview.previewRemoveCursor),
     )
     await shot('04b-chip-preview')
+
+    // The list has to survive the pointer travelling from the chip into it, or
+    // the row's delete button can never be reached with a real mouse.
+    const panelBox = await page.locator('[data-dsh-picker-ui="chip-preview"]').boundingBox()
+    await page.mouse.move(panelBox.x + panelBox.width / 2, panelBox.y + panelBox.height / 2, { steps: 8 })
+    await page.waitForTimeout(500)
+    const afterEnter = await overlayState(page)
+    check(
+      'the preview stays open while the pointer is inside it',
+      afterEnter.previewVisible === true,
+      String(afterEnter.previewVisible),
+    )
+
     await page.mouse.move(4, 4)
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(500)
 
     // Leave the mode before exercising the delete controls: while selecting,
     // clicks belong to the picker.
@@ -569,9 +582,12 @@ async function runScenario(browser, mode, origin) {
       afterRowRemove.chips.length === 1 && /^1 个元素$/.test(afterRowRemove.chips[0]?.label ?? ''),
       JSON.stringify(afterRowRemove.chips),
     )
-    await page.hover('[data-composer-chip="element-picker"]')
-    await page.waitForTimeout(400)
     const afterRowRemovePreview = await overlayState(page)
+    check(
+      'the preview stays open after a row is dropped',
+      afterRowRemovePreview.previewVisible === true,
+      String(afterRowRemovePreview.previewVisible),
+    )
     check(
       'the preview now lists only what is left',
       afterRowRemovePreview.previewRows === 1,
