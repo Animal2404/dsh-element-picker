@@ -166,6 +166,43 @@ test('the pill label is one line: the element, not the whole block', () => {
   assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent.includes('[选择器]'), false)
 })
 
+test('a block rendered as one inline badge per field folds once', () => {
+  const doc = createDocument()
+  const line = doc.createElement('p')
+  const badges = BLOCK_LINES.map((text) => {
+    const badge = doc.createElement('span')
+    badge.textContent = text
+    line.appendChild(badge)
+    return badge
+  })
+  doc.body.appendChild(line)
+
+  assert.equal(foldTranscriptBlocks(doc), 1)
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
+  assert.equal(badges[0].getAttribute(FOLD_MARKER), 'true')
+  for (const badge of badges) assert.equal(badge.style.display, 'none')
+})
+
+test("a block inside a table cell folds at the cell's own wrapper", () => {
+  const doc = createDocument()
+  const table = doc.createElement('table')
+  const tbody = doc.createElement('tbody')
+  const row = doc.createElement('tr')
+  const cell = doc.createElement('td')
+  const wrapper = doc.createElement('span')
+  wrapper.textContent = BLOCK_LINES.slice(0, 3).join(String.fromCharCode(10))
+  cell.appendChild(wrapper)
+  row.appendChild(cell)
+  tbody.appendChild(row)
+  table.appendChild(tbody)
+  doc.body.appendChild(table)
+
+  assert.equal(foldTranscriptBlocks(doc), 1)
+  assert.equal(wrapper.getAttribute(FOLD_MARKER), 'true')
+  assert.equal(cell.getAttribute(FOLD_MARKER), null, 'the cell itself is left alone')
+  assert.equal(row.getAttribute(FOLD_MARKER), null)
+})
+
 test('the composer is never folded', () => {
   const { doc } = fixture({ inComposer: true })
   assert.equal(foldTranscriptBlocks(doc), 0)
