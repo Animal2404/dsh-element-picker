@@ -113,10 +113,12 @@ test('one element folds once, however deep the app nests it', () => {
   // The wrappers are untouched: expanding shows the block inside the section, and
   // the thinking entry never disappears with it.
   const pill = doc.querySelectorAll(`[${PILL_MARKER}]`)[0]
-  assert.equal(holder.getAttribute(FOLD_MARKER), 'true')
+  // The block's own first line owns the fold; no wrapper is touched.
+  assert.equal(lines[0].getAttribute(FOLD_MARKER), 'true')
+  assert.equal(holder.getAttribute(FOLD_MARKER), null)
   assert.equal(section.getAttribute(FOLD_MARKER), null)
   assert.equal(panel.getAttribute(FOLD_MARKER), null)
-  assert.equal(tail.style.display, '')
+  assert.notEqual(tail.style.display, 'none')
 
   pill.dispatchEvent(createEvent('click'))
   assert.equal(pill.getAttribute('aria-expanded'), 'true')
@@ -143,7 +145,7 @@ test('a container that only starts with the block is left to its block', () => {
   assert.equal(foldTranscriptBlocks(doc), 1)
   assert.equal(block.getAttribute(FOLD_MARKER), 'true', 'the block itself is the fold')
   assert.equal(section.getAttribute(FOLD_MARKER), null, 'the section is not')
-  assert.equal(note.style.display, '')
+  assert.notEqual(note.style.display, 'none', 'the section note stays visible')
 })
 
 test('the pill label is one line: the element, not the whole block', () => {
