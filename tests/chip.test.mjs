@@ -514,7 +514,7 @@ test('dropping a preview row removes that element and keeps the rest grouped', (
   assert.equal(calls.inserted.length, 1)
   const payload = calls.inserted[0].ref
   assert.equal(calls.inserted[0].label, '2 个元素')
-  assert.equal(payload.includes('[元素] a'), true)
+  assert.equal(payload.includes('[选择器] button.x'), true, 'the first element survives')
   assert.equal(payload.includes('（2）[元素] c'), true, 'elements are renumbered from one')
   assert.equal(payload.includes('[元素] b'), false, 'the dropped element is gone')
 })
