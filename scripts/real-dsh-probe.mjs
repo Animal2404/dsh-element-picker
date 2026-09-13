@@ -508,6 +508,72 @@ if (picked !== null && picked.chipSource !== null) {
 }
 
 
+// ------------------------------------------------- picking inside a menu
+// Menus are the case the picker used to lose: they dismiss on WINDOW-capture
+// pointerdown, and entering selection mode by click closes them anyway. The
+// way in is the keyboard toggle.
+await step('picking inside a menu that dismisses itself on pointerdown', async () => {
+  const button = await page.evaluate(() => {
+    const card = document.querySelector('[data-composer-card]')
+    if (card === null) return null
+    const found = [...card.querySelectorAll('button')].find((b) => /DeepSeek|V4|GPT|Claude/i.test(b.textContent ?? ''))
+    if (found === undefined) return null
+    const box = found.getBoundingClientRect()
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+  })
+  if (button === null) {
+    skip('picking inside a menu', 'no model selector in the composer row')
+    return
+  }
+
+  await page.mouse.click(button.x, button.y)
+  await page.waitForTimeout(700)
+  const itemSelector = '[role="menuitem"], [role="option"]'
+  const openItems = await page.evaluate((selector) => document.querySelectorAll(selector).length, itemSelector)
+  if (openItems === 0) {
+    skip('picking inside a menu', 'the menu did not open in this run')
+    return
+  }
+  say(`menu opened with ${openItems} item(s)`)
+
+  await page.keyboard.press('Control+Shift+E')
+  await page.waitForTimeout(300)
+  const active = await page.evaluate(
+    () => document.querySelector('[data-dsh-picker-ui="root"]').getAttribute('data-dsh-picker-active'),
+  )
+  must('the keyboard toggle enters selection mode with a menu open', active === 'true', String(active))
+  const survived = await page.evaluate((selector) => document.querySelectorAll(selector).length, itemSelector)
+  must('the menu survived the keyboard toggle', survived === openItems, `${openItems} -> ${survived}`)
+
+  const item = await page.evaluate((selector) => {
+    const element = document.querySelector(selector)
+    if (element === null) return null
+    const box = element.getBoundingClientRect()
+    return {
+      x: box.left + box.width / 2,
+      y: box.top + box.height / 2,
+      text: (element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 24),
+    }
+  }, itemSelector)
+  if (item === null) {
+    skip('picking a menu item', 'the item vanished before the pick')
+    return
+  }
+
+  await page.mouse.click(item.x, item.y)
+  await page.waitForTimeout(900)
+  const chips = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-composer-chip]')].map((chip) => (chip.textContent ?? '').trim()),
+  )
+  const hit = chips.some((label) => label.includes(item.text.slice(0, 5)))
+  must(
+    'the menu item was picked into a chip',
+    hit,
+    JSON.stringify({ item: item.text, chips }),
+  )
+  await page.screenshot({ path: join(out, '09-menu-pick.png') })
+})
+
 // ------------------------------------------------------------------ diagnostics
 // Runs last, and only for evidence: is there a lossless route for multi-line
 // inserts on DSH's Lexical editor? `execCommand('insertText')` provably flattens
