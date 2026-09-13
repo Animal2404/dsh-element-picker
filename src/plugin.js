@@ -28,8 +28,15 @@ export const ENTRY_ID = 'element-picker'
 /** Console prefix for every diagnostic this plugin prints. */
 export const LOG_PREFIX = '[dsh-element-picker]'
 
-/** Cordis services this plugin needs. */
-export const inject = ['slots']
+/**
+ * Cordis services this plugin needs.
+ *
+ * Every service property is guarded: reading one that is not declared here
+ * throws ("cannot get property X without inject"), and a throw inside apply
+ * aborts the host's boot. So each service the picker touches is listed, even the
+ * ones only used on the pick path.
+ */
+export const inject = ['slots', 'inputTriggers', 'conversation', 'sessions']
 
 /**
  * @param {...unknown} args - Values to log.

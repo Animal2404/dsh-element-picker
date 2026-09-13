@@ -64,7 +64,11 @@ test('the factory publishes apply and inject and requires only platform modules'
 
   assert.deepEqual(required, ['react'])
   assert.equal(typeof exports.apply, 'function')
-  assert.deepEqual([...exports.inject], ['slots'])
+  assert.deepEqual(
+    [...exports.inject],
+    ['slots', 'inputTriggers', 'conversation', 'sessions'],
+    'every guarded service the picker touches must be declared',
+  )
 })
 
 test('apply registers a fresh entry in the composer tool row', () => {
