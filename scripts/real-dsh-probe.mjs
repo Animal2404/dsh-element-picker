@@ -382,10 +382,16 @@ if (state.pickerSlotButton === 1) {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
     if (control === null) return null
     const box = control.getBoundingClientRect()
+    // Mirror the control's own rule: the first candidate that actually has a box.
     let row = null
     for (const selector of ['.sbw-wrap', '[class*="footerActions"]', '[class*="footArea"]']) {
-      row = document.querySelector(selector)
-      if (row !== null) break
+      const candidate = document.querySelector(selector)
+      if (candidate === null) continue
+      const candidateBox = candidate.getBoundingClientRect()
+      if (candidateBox.width > 0 && candidateBox.height > 0) {
+        row = candidate
+        break
+      }
     }
     const rowBox = row === null ? null : row.getBoundingClientRect()
     return {
