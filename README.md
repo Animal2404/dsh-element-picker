@@ -85,15 +85,9 @@ that render them, so a follow-up request ("move this button") starts from a path
 instead of a class hash. The path is shortened to its last two segments, because
 every character lands in the user's composer.
 
-The verbose text shape is opt-in, per plugin row (it also disables the chip):
+Hold **Shift** while picking to insert the full block instead of a chip.
 
-```yaml
-- id: element-picker
-  config:
-    detailed: true
-```
-
-which emits the full block — `[元素] [选择器] [XPath] [位置] [样式] [属性] [源码] [HTML]`:
+It emits: — `[元素] [选择器] [XPath] [位置] [样式] [属性] [源码] [HTML]`:
 
 ```
 [元素] button.primary "发送"

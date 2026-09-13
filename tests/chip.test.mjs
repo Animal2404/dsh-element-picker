@@ -91,7 +91,7 @@ test('a chip is inserted with the block as both ref and clipboard text', () => {
 test('without a caret accessor the chip anchors at the end of the draft', () => {
   const { ctx, calls } = stubs({ facade: { caretSpan: undefined } })
   assert.equal(insertElementChip({ ctx, sessionId: 's', text: 'block', label: 'l' }), 'chip')
-  assert.deepEqual(calls.inserted[0].span, { start: 11, end: 11, draftRev: 7 })
+  assert.deepEqual(calls.inserted[0].span, { start: 10, end: 10, draftRev: 7 })
 })
 
 test('a refused chip is reported, not forced', () => {

@@ -125,8 +125,8 @@ const PICKER_STATE = {
   picker: null,
   inputActions: undefined,
   draft: '',
-  // Compact by default: one line per pick. `config: { detailed: true }` on the
-  // plugin row restores the full block for debugging.
+  // A pick inserts a chip (compact in the composer, expanded on send); holding
+  // Shift while picking inserts the full text block instead.
   detailed: false,
   sessionId: undefined,
   ctx: undefined,
@@ -152,7 +152,7 @@ const PICKER_STATE = {
  * @param {Element} element - The resolved element.
  * @returns {void}
  */
-function insertPickedElement(element) {
+function insertPickedElement(element, detailed = false) {
   const doc = element.ownerDocument
   const win = doc.defaultView ?? undefined
   let text = ''
@@ -161,7 +161,7 @@ function insertPickedElement(element) {
       doc,
       win,
       scroll: { x: win?.scrollX ?? 0, y: win?.scrollY ?? 0 },
-      detailed: PICKER_STATE.detailed,
+      detailed: detailed === true,
     })
   } catch (error) {
     log('failed to describe element:', String(error))
@@ -170,7 +170,7 @@ function insertPickedElement(element) {
 
   // A chip is the DSH-native shape for this: compact in the composer, expanded
   // into the block above by the chip's codec when the message is sent.
-  if (PICKER_STATE.detailed !== true) {
+  if (detailed !== true) {
     // The trigger registry may not have been up when the plugin applied
     // (service ordering), so registration is retried before the first chip use.
     if (PICKER_STATE.chipReady !== true) {
@@ -179,7 +179,7 @@ function insertPickedElement(element) {
     }
   }
 
-  if (PICKER_STATE.detailed !== true && PICKER_STATE.chipReady === true) {
+  if (detailed !== true && PICKER_STATE.chipReady === true) {
     const chip = insertElementChip({
       ctx: PICKER_STATE.ctx,
       sessionId: PICKER_STATE.sessionId,
@@ -217,9 +217,24 @@ function insertPickedElement(element) {
  * @returns {void}
  */
 export function apply(ctx) {
+  try {
+    applyPicker(ctx)
+  } catch (error) {
+    // A throwing loader entry aborts the host's boot (an empty page, not a
+    // missing button), so the picker contains its own failures.
+    log('apply failed; the picker stays inert:', String(error))
+  }
+}
+
+/**
+ * Mount the overlay and register the composer control.
+ *
+ * @param {import('@deepseek-ai/cordis').Context} ctx - Plugin context.
+ * @returns {void}
+ */
+function applyPicker(ctx) {
   const win = window
   const doc = win.document
-  PICKER_STATE.detailed = ctx !== undefined && ctx.config !== undefined && ctx.config.detailed === true
   PICKER_STATE.ctx = ctx
   const chipsRegistered = registerChipSource(ctx)
   PICKER_STATE.chipReady = chipsRegistered
@@ -228,8 +243,9 @@ export function apply(ctx) {
   const picker = createPicker({
     doc,
     win,
-    onPick: (element) => {
-      insertPickedElement(element)
+    onPick: (element, event) => {
+      // Shift is the escape hatch to the verbose block; no config plumbing.
+      insertPickedElement(element, event !== undefined && event.shiftKey === true)
     },
     onEvent: (event) => {
       if (event.type === 'pick' || event.type === 'cancel-escape' || event.type === 'pick-missed') {
@@ -241,8 +257,8 @@ export function apply(ctx) {
   PICKER_STATE.picker = picker
 
   log(
-    `mode: ${PICKER_STATE.detailed ? 'detailed text block' : 'chip (text fallback)'}` +
-      `${PICKER_STATE.detailed ? '' : chipsRegistered ? '' : ' — chip codec not registered'}`,
+    `mode: chip with a text fallback${chipsRegistered ? '' : ' — chip codec not registered yet'}` +
+      '; Shift+click inserts the full text block',
   )
 
   ctx.slots.inject(SLOT, () =>

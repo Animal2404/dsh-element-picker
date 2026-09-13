@@ -29,7 +29,7 @@
 export const PICKER_MARKER = 'data-dsh-picker-ui'
 
 /** Hint text shown while selection mode is on. */
-export const HINT_TEXT = '选择模式：点击界面元素插入定位信息 · 再点工具行按钮或 Esc 取消'
+export const HINT_TEXT = '选择模式：点击元素插入定位信息 · Shift+点击插入完整信息 · 再点工具行按钮或 Esc 取消'
 
 /** Event types swallowed in the capture phase while selection mode is on. */
 const SWALLOWED_EVENTS = [
