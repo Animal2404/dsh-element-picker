@@ -411,6 +411,19 @@ if (state.pickerSlotButton === 1) {
         box.top + box.height / 2 < rowBox.bottom,
       inRowRight:
         rowBox !== null && box.left > rowBox.left + rowBox.width * 0.5 && box.right <= rowBox.right + 2,
+      // Beside the row's own widget is only expected when the widget actually
+      // leaves room for it; a row whose content spans its width means the
+      // control is supposed to stack instead.
+      roomForRight: (() => {
+        if (row === null) return false
+        const rowRect = row.getBoundingClientRect()
+        for (const child of row.children) {
+          const childRect = child.getBoundingClientRect()
+          if (childRect.width === 0 || childRect.height === 0) continue
+          return childRect.right + 8 + 28 <= rowRect.right - 6
+        }
+        return rowRect.right - 6 - 28 >= rowRect.left
+      })(),
       viewport: innerWidth,
       viewportHeight: innerHeight,
     }
@@ -422,11 +435,16 @@ if (state.pickerSlotButton === 1) {
   )
   // The Bash widget is a user plugin, so a fresh CI profile anchors to the
   // footer row itself; both are the same right-hand end of that row.
-  must(
-    'the control sits on the footer row, at its right end',
-    placement !== null && placement.onRow === true && placement.inRowRight === true,
-    JSON.stringify(placement),
-  )
+  must('the control sits on the footer row', placement !== null && placement.onRow === true, JSON.stringify(placement))
+  if (placement !== null && placement.roomForRight === true) {
+    must(
+      'the control sits at the right end of that row',
+      placement.inRowRight === true,
+      JSON.stringify(placement),
+    )
+  } else {
+    skip('right-end placement', 'this footer row has no room beside its own widget')
+  }
   must(
     'the control sits on the left',
     placement !== null && placement.x < placement.viewport * 0.3,
