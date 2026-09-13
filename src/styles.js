@@ -46,7 +46,7 @@ export const PICKER_CSS = `
 }
 
 [data-dsh-picker-ui="highlight"] {
-  position: absolute;
+  position: fixed;
   display: none;
   pointer-events: none;
   background: rgba(77, 107, 254, 0.14);

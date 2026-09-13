@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>DSH Element Picker — harness</title>
+    <style>
+      /* A deliberately plain page: the harness reproduces the DSH composer's DOM
+         contract, not its visual design. */
+      body {
+        margin: 0;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0f1115;
+        color: #e5e7eb;
+      }
+      #app {
+        display: flex;
+        min-height: 100vh;
+      }
+      aside {
+        width: 180px;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 12px;
+      }
+      main {
+        flex: 1;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 16px;
+      }
+      .app-button {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: #1b1e25;
+        color: inherit;
+        cursor: pointer;
+      }
+      [data-composer-seat] {
+        margin-top: 24px;
+      }
+      [data-composer-card] {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        padding: 12px;
+        background: #14171d;
+      }
+      [data-composer-input] {
+        min-height: 56px;
+        outline: none;
+        white-space: pre-wrap;
+      }
+      [data-composer-input][data-placeholder]:empty::before {
+        content: attr(data-composer-placeholder);
+        color: #6b7280;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+      }
+      button[aria-label="发送消息"] {
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: none;
+        background: #4d6bfe;
+        color: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <aside>
+        <button id="sidebar-toggle" class="app-button" aria-label="收起侧栏">侧栏</button>
+      </aside>
+      <main>
+        <h1>元素选择器 harness</h1>
+        <div data-composer-seat>
+          <div data-composer-card>
+            <div data-input-scroll>
+              <div
+                data-composer-input
+                contenteditable="true"
+                role="textbox"
+                aria-multiline="true"
+                data-phase="idle"
+                data-composer-placeholder="描述你想要构建的内容"
+              ></div>
+            </div>
+            <div class="row">
+              <div id="slot-left"></div>
+              <button class="primary" aria-label="发送消息" data-testid="send">发送</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/vendor/react.js"></script>
+    <script src="/vendor/react-dom.js"></script>
+    <script src="/harness/host-stub.js"></script>
+    <script src="/lib/client.js"></script>
+    <script>
+      window.__harness.boot()
+    </script>
+  </body>
+</html>

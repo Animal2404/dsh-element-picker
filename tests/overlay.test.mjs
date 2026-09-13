@@ -79,8 +79,10 @@ test('the floating button toggles selection mode both ways', () => {
   assert.equal(node(doc, 'root').getAttribute('data-dsh-picker-active'), 'false')
 })
 
-test('hovering highlights the resolved element at page coordinates', () => {
+test('hovering highlights the resolved element in viewport coordinates', () => {
   const { doc, win, target } = fixture()
+  // The highlight is fixed, so scroll must not shift it: the box is reported in
+  // viewport coordinates and repainted on scroll instead.
   win.scrollX = 10
   win.scrollY = 30
   const picker = createPicker({ doc, win, onPick: () => {} })
@@ -90,8 +92,8 @@ test('hovering highlights the resolved element at page coordinates', () => {
 
   const highlight = node(doc, 'highlight')
   assert.equal(highlight.getAttribute('data-dsh-picker-visible'), 'true')
-  assert.equal(highlight.style.left, '110px')
-  assert.equal(highlight.style.top, '230px')
+  assert.equal(highlight.style.left, '100px')
+  assert.equal(highlight.style.top, '200px')
   assert.equal(highlight.style.width, '44px')
   assert.equal(highlight.style.height, '30px')
   assert.equal(target.textContent, '发送')

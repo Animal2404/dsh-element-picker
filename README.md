@@ -67,8 +67,31 @@ Nothing in this repository is built, tested, or run on a developer machine.
 - `npm run verify` — asserts the artifact's loader contract;
 - `npm test` — selector, describe, insertion-cascade, overlay, and
   loader/registration suites, all dependency-free;
+- `.github/workflows/e2e.yml` — a real Chromium, driven through the whole
+  interaction, over a harness page that reproduces the composer's DOM contract
+  and loads the built bundle through a loader stub with the real React UMD
+  build. It asserts the highlight geometry against the element's bounding box,
+  that the swallowed click never reaches the application, that ordinary
+  interaction resumes afterwards, and that Escape cancels without inserting.
+  Screenshots are uploaded as the evidence artifact. What it does **not** prove
+  is that DSH's real Lexical editor behaves like the harness editable — that is
+  the remaining unknown, and it needs a real DSH build (see Verification
+  status);
 - `publish-lib` — commits the built `lib/` back to `main`, because a DSH client
   plugin must ship a built `./client` export and local builds are not allowed.
+
+## Verification status
+
+| Layer | Evidence |
+| --- | --- |
+| Selector, block, cascade, overlay logic | 37 `node:test` assertions, green in CI |
+| Built artifact contract | `verify-bundle` + the loader/registration suite, green in CI |
+| Real browser behaviour | Playwright run over the harness page, green in CI, screenshots archived |
+| Real DSH 0.1.5-rc.2 (Lexical composer, live slot) | not yet covered — requires a real DSH build |
+
+The harness is a stub host, not DSH: it reproduces the DOM contract and the
+`slots`/`inputActions` surface the plugin consumes. Treat its result as
+"the picker's own logic works in a browser", not "it works in DSH".
 
 ## Install
 

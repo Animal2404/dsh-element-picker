@@ -1,0 +1,54 @@
+name: e2e
+
+# Browser-level acceptance run, cloud only. Serves a harness page that
+# reproduces the DSH composer's DOM contract, loads the built bundle the way the
+# DSH client module system does, and drives a real Chromium through the whole
+# interaction. Screenshots are uploaded as the evidence artifact.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: selection mode, highlight, insert, cancel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The harness deliberately keeps the repository itself dependency-free:
+      # these are test-only dependencies (Playwright plus the real React UMD
+      # build the harness host stub resolves for require('react')).
+      - name: Install harness dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the client bundle
+        run: npm run build
+
+      - name: Run the browser acceptance run
+        run: npm run e2e
+
+      - name: Upload screenshots and console evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: .e2e-out/
+          if-no-files-found: warn
