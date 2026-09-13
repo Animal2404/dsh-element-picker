@@ -21,6 +21,11 @@ different job (a browser extension), not this one.
    line where chips are unavailable), and selection mode exits.
 4. Click the button again, or press Escape: selection mode exits without
    picking.
+5. `Ctrl+Shift+E` toggles selection mode from the keyboard. That is how you pick
+   inside a menu: open the menu first, toggle with the shortcut, then click the
+   item — entering selection mode by click would dismiss the menu, and clicking
+   inside it while selecting is swallowed by the picker before the menu's own
+   `pointerdown` dismissal can fire.
 5. Selector generation prefers the hooks DSH exposes on purpose (`data-*`
    markers) over CSS-module class names, which are build-time hashes, and still
    falls back to a unique positional path when nothing stable exists.

@@ -31,6 +31,14 @@ export const PICKER_MARKER = 'data-dsh-picker-ui'
 /** Hint text shown while selection mode is on. */
 export const HINT_TEXT = '选择模式：点击元素插入定位信息 · Shift+点击插入完整信息 · 再点工具行按钮或 Esc 取消'
 
+/**
+ * Keyboard toggle. Menus cannot be opened *while* selecting (their opening
+ * click is swallowed), so the way to pick inside one is: open the menu, toggle
+ * selection mode from the keyboard, then click the item — the picker's
+ * window-capture swallow beats the menu's own dismissal.
+ */
+const TOGGLE_SHORTCUT_KEY = 'e'
+
 /** Event types swallowed in the capture phase while selection mode is on. */
 const SWALLOWED_EVENTS = [
   'pointerdown',
@@ -216,6 +224,12 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   }
 
   const onKeyDown = (event) => {
+    if (event.ctrlKey === true && event.shiftKey === true && event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY) {
+      swallow(event)
+      setActive(!active)
+      emit({ type: 'toggle-shortcut' })
+      return
+    }
     if (!active) return
     if (event.key !== 'Escape') return
     swallow(event)

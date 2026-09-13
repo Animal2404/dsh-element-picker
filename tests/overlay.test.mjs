@@ -144,6 +144,28 @@ test('the picker never picks its own UI', () => {
   assert.equal(picker.isActive(), true, 'clicking the overlay is not a pick and does not exit')
 })
 
+test('Ctrl+Shift+E toggles selection mode from the keyboard', () => {
+  const { doc, win } = fixture()
+  const picker = createPicker({ doc, win, onPick: () => {} })
+
+  const on = createEvent('keydown', { key: 'E' })
+  on.ctrlKey = true
+  on.shiftKey = true
+  fire(win, 'keydown', on)
+  assert.equal(picker.isActive(), true, 'a menu can be preserved this way')
+  assert.equal(on.prevented, true, 'the app must not also act on the chord')
+
+  const off = createEvent('keydown', { key: 'e' })
+  off.ctrlKey = true
+  off.shiftKey = true
+  fire(win, 'keydown', off)
+  assert.equal(picker.isActive(), false)
+
+  const unrelated = createEvent('keydown', { key: 'e' })
+  fire(win, 'keydown', unrelated)
+  assert.equal(picker.isActive(), false, 'a bare E must not toggle')
+})
+
 test('Escape leaves selection mode without picking', () => {
   const { doc, win } = fixture()
   const picks = []

@@ -104,7 +104,7 @@ function PickerButton(props) {
       'data-dsh-picker-ui': 'slot-button',
       'aria-label': '选择界面元素加入聊天',
       'aria-pressed': active ? 'true' : 'false',
-      title: '选择界面元素加入聊天',
+      title: '选择界面元素加入聊天（Ctrl+Shift+E 切换，菜单内选择请用快捷键进入选择模式）',
       style: {
         display: 'inline-flex',
         alignItems: 'center',
