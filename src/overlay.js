@@ -121,7 +121,6 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   const host = doc.body ?? doc.documentElement
   host.appendChild(root)
   place()
-  watchLayout()
 
   let active = false
   let current = null
@@ -285,6 +284,8 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     emit({ type: active ? 'enter' : 'leave' })
     return active
   }
+
+  watchLayout()
 
   button.addEventListener('click', (event) => {
     event.preventDefault()
