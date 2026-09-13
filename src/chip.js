@@ -61,7 +61,7 @@ export function registerChipSource(ctx) {
         // The draft shows the compact line; the model gets the block from
         // `serialize` (DSH expands every chip through the codec before sending).
         clipboardText: (ref) => compactChipText(ref),
-        serialize: (ref) => Promise.resolve(ref),
+        serialize: (ref) => Promise.resolve(modelFormOf(ref)),
       },
     })
     return true
@@ -174,6 +174,41 @@ export function compactChipText(ref) {
   const header = parts[0].startsWith('[元素组]') ? parts.shift() : `[元素组] ${parts.length} 个界面元素`
   const blocks = parts.map((block, index) => `（${index + 1}）${compactBlock(block)}`)
   return [header, ...blocks].join(LF)
+}
+
+/** First words of the line that introduces the block to the model. */
+const MODEL_LEAD_PREFIX = '我选取了 '
+const MODEL_LEAD_TAIL = ' 个界面元素，以下是定位信息：'
+
+/**
+ * Whether a line is the sentence this plugin puts before a block.
+ *
+ * The session-title providers read the first human message, and a message that
+ * is nothing but `[元素] div.uV2eYG_input …` gets titled after that element.
+ * The lead line gives them something human to read; the transcript fold hides it
+ * together with the block, so the conversation itself gains no extra line.
+ *
+ * @param {string} text - One line of message text.
+ * @returns {boolean} True for the lead line.
+ */
+export function isModelLead(text) {
+  const line = String(text ?? '').trim()
+  return line.startsWith(MODEL_LEAD_PREFIX) && line.endsWith(MODEL_LEAD_TAIL)
+}
+
+/**
+ * The model form of a block: a sentence, then the locating detail.
+ *
+ * DSH replaces each chip's draft slice with this at submit time, so this is what
+ * the model reads and what the session title is drawn from.
+ *
+ * @param {unknown} ref - Chip reference (our block, as a string).
+ * @returns {string} The text that stands in for the chip.
+ */
+export function modelFormOf(ref) {
+  if (typeof ref !== 'string') return String(ref ?? '')
+  const count = (ref.split(GROUP_ITEM_RE).length - 1) || 1
+  return `${MODEL_LEAD_PREFIX}${count}${MODEL_LEAD_TAIL}${LF}${ref}`
 }
 
 /**

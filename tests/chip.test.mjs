@@ -20,6 +20,8 @@ import {
   chipIndexOf,
   chipLabel,
   compactChipText,
+  isModelLead,
+  modelFormOf,
   occurrencePayload,
   chipPayloadOf,
   chipSpan,
@@ -116,7 +118,10 @@ test('the chip source is registered with a codec that expands the block', async 
   assert.equal(draft.includes('[选择器]'), true, draft)
   assert.equal(draft.includes('[XPath]'), false, draft)
   assert.equal(draft.includes('[HTML]'), false, draft)
-  assert.equal(await source.codec.serialize(BLOCK), BLOCK, 'the model receives the block, not the draft line')
+  const model = await source.codec.serialize(BLOCK)
+  assert.equal(model.endsWith(BLOCK), true, 'the model receives the whole block')
+  assert.equal(model.startsWith('我选取了 1 个界面元素'), true, model)
+  assert.equal(isModelLead(model.split(String.fromCharCode(10))[0]), true)
 })
 
 test('registering without a trigger registry reports failure instead of throwing', () => {
@@ -464,6 +469,21 @@ test('a group payload parses back into one preview row per element', () => {
   assert.equal(rows[0].block.includes('[选择器] span.a'), true)
   assert.equal(rows[0].block.includes('（2）'), false, 'a block is bare, without its number')
   assert.equal(rows[1].block.includes('[选择器] div.b'), true)
+})
+
+test('the model form leads with a sentence, so the title is not an element name', () => {
+  const single = modelFormOf(BLOCK)
+  assert.equal(single.startsWith('我选取了 1 个界面元素，以下是定位信息：'), true, single)
+  assert.equal(single.endsWith(BLOCK), true)
+
+  // A group counts its elements, so the lead reads correctly for both.
+  const group = modelFormOf('[元素组] 3 个界面元素' + String.fromCharCode(10) + '（1）[元素] a')
+  assert.equal(group.startsWith('我选取了 3 个界面元素，以下是定位信息：'), true, group)
+
+  // The lead is the fold's, not the block's: it is recognised on its own.
+  assert.equal(isModelLead('我选取了 2 个界面元素，以下是定位信息：'), true)
+  assert.equal(isModelLead('[元素] button \"发送\"'), false)
+  assert.equal(isModelLead('随便说点什么'), false)
 })
 
 test('the compact draft line keeps only what locates the element', () => {

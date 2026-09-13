@@ -514,6 +514,11 @@ async function runScenario(browser, mode, origin) {
       afterInsert.serializedPrompt.slice(0, 90),
     )
     check(
+      'the prompt opens with a sentence, so the title is not an element name',
+      /^我选取了 \d+ 个界面元素/.test(afterInsert.serializedPrompt.trim()),
+      afterInsert.serializedPrompt.slice(0, 60),
+    )
+    check(
       'the codec that expands the chip on send was registered',
       afterInsert.chipCodec === 'element-picker',
       String(afterInsert.chipCodec),

@@ -143,6 +143,47 @@ test('the label stops at the next field when the renderer uses spaces', () => {
   assert.equal(label.includes('[XPath]'), false, label)
 })
 
+test('the sentence in front of a block folds with it', () => {
+  const doc = createDocument()
+  const lead = doc.createElement('p')
+  lead.textContent = '我选取了 1 个界面元素，以下是定位信息：'
+  const lines = BLOCK_LINES.map((text) => {
+    const line = doc.createElement('p')
+    line.textContent = text
+    return line
+  })
+  const host = doc.createElement('div')
+  host.appendChild(lead)
+  for (const line of lines) host.appendChild(line)
+  doc.body.appendChild(host)
+
+  assert.equal(foldTranscriptBlocks(doc), 1)
+  const pill = doc.querySelectorAll(`[${PILL_MARKER}]`)[0]
+  assert.equal(lead.style.display, 'none', 'the lead hides with the block')
+  assert.equal(lines[0].getAttribute(FOLD_MARKER), 'true', 'the block still owns the fold')
+  // The pill sits before the lead, so the message reads as one pill and nothing else.
+  assert.equal(pill.previousElementSibling === null || pill.previousElementSibling === undefined, true)
+  assert.equal(pill.nextElementSibling, lead)
+
+  // Re-rendering without markers must not stack a second pill behind the lead.
+  for (const line of lines) line.removeAttribute(FOLD_MARKER)
+  assert.equal(foldTranscriptBlocks(doc), 0)
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
+})
+
+test('a cell that renders the lead and the block as one text node folds once', () => {
+  const doc = createDocument()
+  const cell = doc.createElement('div')
+  cell.textContent = '我选取了 1 个界面元素，以下是定位信息：' + String.fromCharCode(10) + BLOCK_LINES.join(' ')
+  doc.body.appendChild(cell)
+
+  assert.equal(foldTranscriptBlocks(doc), 1)
+  assert.equal(cell.getAttribute(FOLD_MARKER), 'true')
+  const label = doc.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent
+  assert.equal(label.includes('span \"完全权限\"'), true, label)
+  assert.equal(label.includes('我选取了'), false, label)
+})
+
 test('a container that only starts with the block is left to its block', () => {
   const doc = createDocument()
   const section = doc.createElement('div')

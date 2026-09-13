@@ -12,6 +12,8 @@
  * selecting, copying, and the model's own view are all unaffected.
  */
 
+import { isModelLead } from './chip.js'
+
 /** Marker on the pill this module renders. Also keeps the picker off it. */
 export const PILL_MARKER = 'data-dsh-picker-transcript-pill'
 
@@ -29,6 +31,30 @@ const OPENS_RE = /^(?:（\d+）)?\s*\[元素\]\s*/
 
 /** The line that opens a block, group payloads included. */
 const OPENS_ANY_RE = /^(?:（\d+）)?\s*\[(?:元素组|元素)\]\s*/
+
+
+/**
+ * Whether a pill already owns the block this element starts.
+ *
+ * Walks back over the block's own lines — the lead sentence and the field lines
+ * after it — because a re-render can drop the markers while leaving the pill, and
+ * folding again would stack one pill on another.
+ *
+ * @param {Element} element - Candidate block owner.
+ * @returns {boolean} True when one of the preceding siblings is a pill.
+ */
+function hasPillBefore(element) {
+  let node = element.previousElementSibling
+  let guard = 0
+  while (node !== null && node !== undefined && guard < 40) {
+    if (typeof node.getAttribute === 'function' && node.getAttribute(PILL_MARKER) !== null) return true
+    const text = (node.textContent ?? '').trim()
+    if (!isModelLead(text) && !FIELD_RE.test(text)) return false
+    node = node.previousElementSibling
+    guard += 1
+  }
+  return false
+}
 
 /**
  * Whether the element sits in the composer rather than in the transcript.
@@ -94,7 +120,10 @@ function isBlockOnly(text) {
     .map((line) => line.trim())
     .filter((line) => line !== '')
   if (lines.length === 0) return false
-  return lines.every((line) => isBlockLine(line))
+  // A block that the model form introduces with a sentence still folds whole.
+  const body = isModelLead(lines[0]) ? lines.slice(1) : lines
+  if (body.length === 0) return false
+  return body.every((line) => isBlockLine(line))
 }
 
 /**
@@ -133,6 +162,13 @@ function foldBlock({ doc, first }) {
   // A block may be one element (newlines inside it) or one element per field;
   // both shapes are collected the same way.
   const folded = [first]
+  // The sentence the model form starts with belongs to the block: hide it too, so
+  // the conversation shows the pill and no stray line of prose.
+  let leading = first.previousElementSibling
+  while (leading !== null && leading !== undefined && isModelLead(leading.textContent ?? '')) {
+    folded.unshift(leading)
+    leading = leading.previousElementSibling
+  }
   let sibling = first.nextElementSibling
   while (sibling !== null && sibling !== undefined) {
     const text = (sibling.textContent ?? '').trim()
@@ -177,7 +213,9 @@ function foldBlock({ doc, first }) {
   })
 
   first.setAttribute(FOLD_MARKER, 'true')
-  first.parentElement?.insertBefore(pill, first)
+  const anchor = folded[0]
+  const host = anchor.parentElement ?? first.parentElement
+  host?.insertBefore(pill, anchor)
   for (const element of folded) element.style.display = 'none'
   return true
 }
@@ -211,10 +249,11 @@ export function foldTranscriptBlocks(doc) {
     // survived a re-render: folding again would stack one pill on another.
     if (element.querySelector(`[${FOLD_MARKER}]`) !== null) continue
     if (element.querySelector(`[${PILL_MARKER}]`) !== null) continue
-    const before = element.previousElementSibling
-    if (before !== null && before !== undefined && before.getAttribute(PILL_MARKER) !== null) continue
+    if (hasPillBefore(element)) continue
     const text = (element.textContent ?? '').trim()
-    if (!OPENS_ANY_RE.test(text)) continue
+    // An element that opens with the lead sentence and then lists the block is the
+    // same block in another rendering (one text node, e.g. a table cell).
+    if (!OPENS_ANY_RE.test(text) && !isModelLead(text.split(String.fromCharCode(10))[0])) continue
     if (!isBlockOnly(text)) continue
     if (foldBlock({ doc, first: element })) folded += 1
   }
