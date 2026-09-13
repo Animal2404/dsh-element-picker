@@ -15,6 +15,8 @@ export const PICKER_CSS = `
   pointer-events: none;
 }
 
+/* Default corner placement; the controller re-anchors this beside the composer
+   card (see overlay.js) so it never sits on top of the send button. */
 [data-dsh-picker-ui="button"] {
   position: fixed;
   right: 20px;
@@ -49,8 +51,8 @@ export const PICKER_CSS = `
   position: fixed;
   display: none;
   pointer-events: none;
-  background: rgba(77, 107, 254, 0.14);
-  outline: 2px solid #4d6bfe;
+  background: rgba(255, 138, 61, 0.16);
+  outline: 2px solid #ff8a3d;
   outline-offset: -1px;
   border-radius: 2px;
 }

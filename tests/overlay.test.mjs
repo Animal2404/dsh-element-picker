@@ -158,6 +158,35 @@ test('Escape leaves selection mode without picking', () => {
   assert.equal(other.prevented, false, 'other keys are untouched')
 })
 
+test('the floating button anchors above the composer card instead of the corner', () => {
+  const doc = createDocument()
+  const win = createWindow(doc)
+  win.innerWidth = 1280
+  const card = doc.createElement('div')
+  card.setAttribute('data-composer-card', '')
+  card.getBoundingClientRect = () => ({ left: 700, top: 600, width: 300, height: 120, right: 1000, bottom: 720 })
+  doc.body.appendChild(card)
+
+  createPicker({ doc, win, onPick: () => {} })
+
+  const button = node(doc, 'button')
+  assert.equal(button.style.bottom, 'auto', 'the corner offset must be released')
+  assert.equal(button.style.top, '552px', 'sits 48px above the card')
+  assert.equal(button.style.right, '288px', 'right-aligned to the card with an 8px gap')
+})
+
+test('without a composer card the corner placement stands', () => {
+  const doc = createDocument()
+  const win = createWindow(doc)
+  const picker = createPicker({ doc, win, onPick: () => {} })
+
+  const button = node(doc, 'button')
+  assert.equal(button.style.top, 'auto')
+  assert.equal(button.style.bottom, '20px')
+  assert.equal(button.style.right, '20px')
+  assert.equal(picker.isActive(), false)
+})
+
 test('dispose removes the overlay and stops listening', () => {
   const { doc, win, target } = fixture()
   const picks = []

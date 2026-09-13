@@ -83,6 +83,31 @@ async function startServer() {
 }
 
 /**
+ * Whether two elements' boxes intersect — the check that catches the overlay
+ * covering app controls (a floating button parked on top of Send, say).
+ *
+ * @param {import('playwright').Page} page - Page under test.
+ * @param {string} selectorA - First element.
+ * @param {string} selectorB - Second element.
+ * @returns {Promise<boolean>} True when the boxes overlap by area.
+ */
+function overlaps(page, selectorA, selectorB) {
+  return page.evaluate(
+    ([a, b]) => {
+      const first = document.querySelector(a)
+      const second = document.querySelector(b)
+      if (first === null || second === null) return false
+      const one = first.getBoundingClientRect()
+      const two = second.getBoundingClientRect()
+      const width = Math.min(one.right, two.right) - Math.max(one.left, two.left)
+      const height = Math.min(one.bottom, two.bottom) - Math.max(one.top, two.top)
+      return width > 0 && height > 0
+    },
+    [selectorA, selectorB],
+  )
+}
+
+/**
  * Read the overlay state out of the page.
  *
  * @param {import('playwright').Page} page - Page under test.
@@ -98,6 +123,7 @@ function overlayState(page) {
       active: root === null ? null : root.getAttribute('data-dsh-picker-active'),
       pressed: button === null ? null : button.getAttribute('aria-pressed'),
       highlightVisible: highlight !== null && highlight.getAttribute('data-dsh-picker-visible') === 'true',
+      highlightOutline: highlight === null ? null : getComputedStyle(highlight).outlineColor,
       highlight: highlight === null ? null : {
         left: Number.parseFloat(highlight.style.left),
         top: Number.parseFloat(highlight.style.top),
@@ -163,6 +189,14 @@ async function runScenario(browser, mode, origin) {
   check('the floating button is mounted', boot.present === true)
   check('selection mode starts off', boot.active === 'false', String(boot.active))
   check('the harness runs the real React build', harness.reactVersion !== undefined, String(harness.reactVersion))
+  check(
+    'the floating button does not cover the composer card',
+    (await overlaps(page, '[data-dsh-picker-ui="button"]', '[data-composer-card]')) === false,
+  )
+  check(
+    'the floating button does not cover the send button',
+    (await overlaps(page, '[data-dsh-picker-ui="button"]', 'button[aria-label="发送消息"]')) === false,
+  )
   await shot('01-boot')
 
   // The composer-row control toggles the same state as the floating button.
@@ -188,6 +222,11 @@ async function runScenario(browser, mode, origin) {
   await page.waitForTimeout(150)
   const hovering = await overlayState(page)
   check('hovering shows the highlight', hovering.highlightVisible === true)
+  check(
+    'the highlight uses the high-contrast outline',
+    hovering.highlightOutline === 'rgb(255, 138, 61)',
+    String(hovering.highlightOutline),
+  )
   check(
     'the highlight matches the hovered element',
     hovering.highlight !== null &&
@@ -231,6 +270,11 @@ async function runScenario(browser, mode, origin) {
   await page.click('#sidebar-toggle')
   const afterNormalClick = await harnessState(page)
   check('ordinary interaction resumes once selection mode is off', afterNormalClick.calls.sidebar === 1, JSON.stringify(afterNormalClick.calls))
+
+  // The composer's own controls must stay usable while the picker is idle.
+  await page.click('button[aria-label="发送消息"]')
+  const afterSendClick = await harnessState(page)
+  check('the send button stays clickable while the picker is idle', afterSendClick.calls.sends === 1, JSON.stringify(afterSendClick.calls))
 
   // Escape cancels without inserting.
   const draftBeforeEscape = (await overlayState(page)).draft

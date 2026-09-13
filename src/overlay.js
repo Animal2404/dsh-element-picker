@@ -120,9 +120,39 @@ export function createPicker({ doc, win, onPick, onEvent }) {
 
   const host = doc.body ?? doc.documentElement
   host.appendChild(root)
+  place()
 
   let active = false
   let current = null
+
+  /**
+   * Anchor the floating button just above the composer card's right edge.
+   *
+   * A fixed corner placement collides with the composer on a layout where the
+   * card spans the viewport width, which would make the send button unclickable
+   * while the picker is idle. Anchoring to the card keeps the button beside the
+   * composer (the same neighbourhood as ZCode's control) and moving with it; if
+   * no card is present, the CSS corner placement stands.
+   *
+   * @returns {void}
+   */
+  function place() {
+    const card =
+      doc.querySelector('[data-composer-card]') ?? doc.querySelector('[data-composer-seat]')
+    if (card === null) {
+      button.style.top = 'auto'
+      button.style.bottom = '20px'
+      button.style.right = '20px'
+      return
+    }
+    const box = card.getBoundingClientRect()
+    const gap = 8
+    const viewportWidth =
+      typeof win.innerWidth === 'number' ? win.innerWidth : box.right + gap
+    button.style.bottom = 'auto'
+    button.style.top = `${Math.max(gap, Math.round(box.top - 48))}px`
+    button.style.right = `${Math.max(gap, Math.round(viewportWidth - box.right + gap))}px`
+  }
 
   /**
    * Reposition the highlight over the current target, in viewport coordinates
@@ -203,6 +233,7 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   }
 
   const onScrollOrResize = () => {
+    place()
     if (active) paint()
   }
 
