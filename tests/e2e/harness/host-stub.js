@@ -162,6 +162,16 @@
             composerInput().textContent = text
             return true
           },
+          // Mirrors the real consumeToken: drop the chip the span points at.
+          consumeToken: function (guard) {
+            if (guard.kind !== 'span') return false
+            var all = document.querySelectorAll('[data-composer-chip]')
+            var chip = all[0]
+            if (chip === undefined) return false
+            chip.remove()
+            chips.projection = ''
+            return true
+          },
           caretSpan: function () { var text = composerInput().textContent; return { start: text.length, end: text.length } },
           insertReference: function (ref, span) {
             chips.inserted.push({ ref: ref, span: span })

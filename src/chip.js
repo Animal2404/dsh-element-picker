@@ -17,8 +17,6 @@
  * worse state than before the pick.
  */
 
-import { findComposerInput } from './insert.js'
-
 /** Reference source name our chips belong to; also the registered codec name. */
 export const CHIP_SOURCE = 'element-picker'
 
@@ -78,6 +76,30 @@ export function registerChipSource(ctx) {
  * @param {(message: string) => void} [note] - Diagnostics sink.
  * @returns {object | null} The facade, or null.
  */
+export function resolveInputBinding(ctx, sessionId, note) {
+  const say = typeof note === 'function' ? note : () => {}
+  if (ctx === undefined || sessionId === undefined) {
+    say('chip skipped: no session-bound context yet')
+    return null
+  }
+  try {
+    const actx = ctx.sessions?.scope?.(sessionId)
+    if (actx === undefined || actx === null) {
+      say('chip skipped: no session scope for this session')
+      return null
+    }
+    const facade = ctx.conversation?.input?.for?.(actx)
+    if (facade === undefined) {
+      say('chip skipped: the input facade is unavailable')
+      return null
+    }
+    return { facade, actx }
+  } catch (error) {
+    say(`chip skipped: ${String(error)}`)
+    return null
+  }
+}
+
 export function resolveFacade(ctx, sessionId, note) {
   const say = typeof note === 'function' ? note : () => {}
   if (ctx === undefined || sessionId === undefined) {
@@ -161,188 +183,159 @@ export function insertElementChip({ ctx, sessionId, text, label, onEvent }) {
   }
 }
 
-/** Attribute carrying the locating block a chip stands for. */
-export const CHIP_BLOCK_ATTR = 'data-dsh-picker-block'
+/** Width of the chip's right-hand remove hit region. */
+export const REMOVE_ZONE_PX = 20
 
-/** Marker attribute on the injected remove affordance. */
-export const CHIP_REMOVE_MARKER = 'data-dsh-picker-remove'
+/** CSS selector naming the chips this plugin inserted. */
+export const CHIP_SELECTOR = `[data-composer-chip="${CHIP_SOURCE}"]`
 
-/** Block text per chip element, so a removal can find its line in the draft. */
-const BLOCK_BY_CHIP = new WeakMap()
-
-/**
- * Remember which block a chip stands for.
- *
- * @param {Element} chip - The chip element.
- * @param {string} block - The locating block it inserts.
- * @returns {void}
- */
-export function rememberChip(chip, block) {
-  BLOCK_BY_CHIP.set(chip, block)
-}
-
-/**
- * @param {Element} chip - A chip element.
- * @returns {string | undefined} The block it stands for, when known.
- */
-export function rememberedBlock(chip) {
-  return BLOCK_BY_CHIP.get(chip)
-}
+/** Every chip in the composer, in document order. */
+const ALL_CHIPS = '[data-composer-chip]'
 
 /**
  * @param {Document} doc - Owning document.
- * @returns {number} How many of the picker's chips are in the composer.
+ * @param {Element} chip - One chip element.
+ * @returns {number} Its index in the composer's chip order, or -1.
  */
-function countChips(doc) {
-  return doc.querySelectorAll(`[data-composer-chip="${CHIP_SOURCE}"]`).length
+export function chipIndexOf(doc, chip) {
+  return [...doc.querySelectorAll(ALL_CHIPS)].indexOf(chip)
 }
 
 /**
- * Add a small × to every picker chip that lacks one.
+ * The detect-coordinate span of one chip.
  *
- * The affordance is injected into the chip's own element so it reads as part of
- * the chip (ZCode's picked-element pill carries one too), and it is idempotent so
- * a re-render that drops it is repaired by the next pass.
+ * `occurrences` are published in clipboard coordinates and every chip counts as
+ * a single detect character (`U+FFFC`), so a chip's detect start is its clipboard
+ * offset minus the excess length of every chip before it.
  *
- * @param {object} options - Decoration request.
- * @param {Document} options.doc - Owning document.
- * @param {(chip: Element) => void} options.onRemove - Invoked when a × is clicked.
- * @returns {number} How many chips were decorated.
+ * @param {readonly object[]} occurrences - `InputState.occurrences`.
+ * @param {number} index - Chip index in document order.
+ * @param {number} draftRev - Current editor revision.
+ * @returns {{ start: number, end: number, draftRev: number } | null} The span.
  */
-export function decorateChips({ doc, onRemove }) {
-  let decorated = 0
-  for (const chip of doc.querySelectorAll(`[data-composer-chip="${CHIP_SOURCE}"]`)) {
-    if (chip.querySelector(`[${CHIP_REMOVE_MARKER}]`) !== null) continue
-    const remove = doc.createElement('span')
-    remove.setAttribute(CHIP_REMOVE_MARKER, '1')
-    remove.setAttribute('contenteditable', 'false')
-    remove.setAttribute('role', 'button')
-    remove.setAttribute('aria-label', '移除该元素')
-    remove.setAttribute('title', '移除该元素')
-    remove.textContent = '×'
-
-    const stop = (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      event.stopImmediatePropagation()
-    }
-    // Swallowed so the editor never moves its caret or selects the chip; only the
-    // picker reacts.
-    remove.addEventListener('pointerdown', stop, true)
-    remove.addEventListener('mousedown', stop, true)
-    remove.addEventListener('click', (event) => {
-      stop(event)
-      onRemove(chip)
-    }, true)
-
-    chip.appendChild(remove)
-    decorated += 1
+export function chipSpan(occurrences, index, draftRev) {
+  if (!Array.isArray(occurrences) || index < 0 || index >= occurrences.length) return null
+  if (typeof draftRev !== 'number') return null
+  let start = occurrences[index].offset
+  for (let i = 0; i < index; i += 1) {
+    start -= Math.max(0, (occurrences[i].length ?? 1) - 1)
   }
-  return decorated
+  return { start, end: start + 1, draftRev }
 }
 
 /**
- * Keep chips decorated across editor updates.
+ * Watch for clicks on a picker chip's remove region.
+ *
+ * The glyph is drawn by the stylesheet (`::after`) rather than injected as a
+ * child: the chip's span is React's portal container, so a foreign child is
+ * outside React's managed tree and can be dropped or reordered by any
+ * re-render — a pseudo-element cannot be. The hit region is therefore computed
+ * from the chip's own box, and the event is swallowed so the editor never moves
+ * its caret.
  *
  * @param {object} options - Watch request.
  * @param {Document} options.doc - Owning document.
  * @param {Window} options.win - Owning window.
- * @param {(chip: Element) => void} options.onRemove - Invoked when a × is clicked.
+ * @param {(chip: Element) => void} options.onRemove - Invoked for a chip click.
+ * @param {() => boolean} [options.isPickerActive] - Skip while selecting.
  * @returns {() => void} Teardown.
  */
-export function watchChips({ doc, win, onRemove }) {
-  decorateChips({ doc, onRemove })
-  if (typeof win.MutationObserver !== 'function') return () => {}
-  let queued = false
-  const flush = () => {
-    queued = false
-    decorateChips({ doc, onRemove })
+export function watchChipRemoval({ doc, win, onRemove, isPickerActive }) {
+  const handle = (event) => {
+    if (typeof isPickerActive === 'function' && isPickerActive()) return
+    const target = event.target
+    if (target === null || typeof target.closest !== 'function') return
+    const chip = target.closest(CHIP_SELECTOR)
+    if (chip === null) return
+    const box = chip.getBoundingClientRect()
+    if (event.clientX < box.right - REMOVE_ZONE_PX) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.stopImmediatePropagation()
+    onRemove(chip)
   }
-  const observer = new win.MutationObserver(() => {
-    if (queued) return
-    queued = true
-    if (typeof win.requestAnimationFrame === 'function') win.requestAnimationFrame(flush)
-    else setTimeout(flush, 16)
-  })
-  observer.observe(doc.body ?? doc.documentElement, { childList: true, subtree: true })
-  return () => observer.disconnect()
+
+  const target = typeof win.addEventListener === 'function' ? win : doc
+  target.addEventListener('mousedown', handle, true)
+  target.addEventListener('pointerdown', handle, true)
+  return () => {
+    target.removeEventListener('mousedown', handle, true)
+    target.removeEventListener('pointerdown', handle, true)
+  }
 }
 
 /**
  * Remove one picked element's chip.
  *
- * Two routes, both verified by counting the picker's chips afterwards:
- *
- * 1. the user's own gesture — put the caret after the chip and send Backspace,
- *    which is exactly what a person would do, and which leaves the rest of the
- *    draft (including a user's own `@file` chips) untouched;
- * 2. the input facade — `setDraft` with the chip's line removed. Deterministic,
- *    but it rebuilds the draft as plain text, so other chips flatten.
+ * `consumeToken` with a span is the honest verb — it is what the composer itself
+ * uses to drop a token without inserting a replacement — and it deletes exactly
+ * that chip node, leaving every other chip (a user's `@file` mentions included)
+ * intact. `setDraft` is deliberately NOT a fallback here: it rebuilds the draft
+ * as plain text and would flatten the user's own chips.
  *
  * @param {object} options - Removal request.
  * @param {Document} options.doc - Owning document.
- * @param {Window} options.win - Owning window.
  * @param {Element} options.chip - The chip to remove.
  * @param {object | null} [options.facade] - Session input facade, when reachable.
- * @param {string} [options.blockText] - The block the chip stands for.
+ * @param {object | null} [options.actx] - Session scope, for the event fallback.
  * @param {(message: string) => void} [options.onEvent] - Diagnostics sink.
  * @returns {string | null} The route that worked, else null.
  */
-export function removeChipElement({ doc, win, chip, facade, blockText, onEvent }) {
+export function removeChipElement({ doc, facade, actx, chip, onEvent }) {
   const note = (message) => {
     if (typeof onEvent === 'function') onEvent(message)
   }
-  const before = countChips(doc)
+  const before = doc.querySelectorAll(CHIP_SELECTOR).length
   if (before === 0) {
     note('remove skipped: no picker chip is present')
     return null
   }
-
-  const editor = findComposerInput(doc)
-  if (editor !== null && typeof doc.createRange === 'function' && typeof win.KeyboardEvent === 'function') {
-    try {
-      if (typeof editor.focus === 'function') editor.focus({ preventScroll: true })
-      const range = doc.createRange()
-      range.selectNode(chip)
-      range.collapse(false)
-      const selection = doc.getSelection()
-      if (selection !== null && selection !== undefined) {
-        selection.removeAllRanges()
-        selection.addRange(range)
-      }
-      editor.dispatchEvent(
-        new win.KeyboardEvent('keydown', {
-          key: 'Backspace',
-          code: 'Backspace',
-          keyCode: 8,
-          which: 8,
-          bubbles: true,
-          cancelable: true,
-        }),
-      )
-      if (countChips(doc) < before) return 'backspace'
-      note('the editor ignored a synthetic Backspace')
-    } catch (error) {
-      note(`native removal failed: ${String(error)}`)
-    }
+  const index = chipIndexOf(doc, chip)
+  if (index < 0) {
+    note('remove skipped: that chip is not in the composer')
+    return null
   }
 
-  const block = blockText ?? rememberedBlock(chip)
-  if (facade !== null && facade !== undefined && typeof facade.setDraft === 'function' && typeof block === 'string' && block !== '') {
+  const attempts = []
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let snapshot = undefined
     try {
-      const snapshot = typeof facade.state?.getSnapshot === 'function' ? facade.state.getSnapshot() : undefined
-      const draft = typeof snapshot?.draft === 'string' ? snapshot.draft : undefined
-      const line = block.replace(/\n+$/, '')
-      if (draft !== undefined && draft.includes(line)) {
-        facade.setDraft(draft.replace(line, ''))
-        if (countChips(doc) < before) return 'setDraft'
-        note('setDraft did not change the chip list')
+      snapshot = typeof facade?.state?.getSnapshot === 'function' ? facade.state.getSnapshot() : undefined
+    } catch (error) {
+      note(`could not read the input state: ${String(error)}`)
+      return null
+    }
+    const span = chipSpan(snapshot?.occurrences ?? [], index, snapshot?.draftRev)
+    if (span === null) {
+      note('remove skipped: the chip has no published occurrence to target')
+      return null
+    }
+
+    let applied = false
+    try {
+      if (typeof facade?.consumeToken === 'function') {
+        applied = facade.consumeToken({ kind: 'span', span }) === true
+        attempts.push(`consumeToken:${applied ? 'ok' : 'refused'}`)
+      } else if (actx !== undefined && actx !== null && typeof actx.bail === 'function') {
+        applied =
+          actx.bail(actx, 'slash/input-consume-token', { guard: { kind: 'span', span } }) === true
+        attempts.push(`event:${applied ? 'ok' : 'refused'}`)
+      } else {
+        note('remove skipped: neither consumeToken nor the scoped event is reachable')
+        return null
       }
     } catch (error) {
-      note(`fallback removal failed: ${String(error)}`)
+      note(`removal threw: ${String(error)}`)
+      return null
     }
+
+    if (applied && doc.querySelectorAll(CHIP_SELECTOR).length < before) {
+      return attempts.join(', ')
+    }
+    // The revision guard is an exact CAS: a keystroke between the read and the
+    // call makes it refuse, so one retry with a fresh snapshot is worthwhile.
   }
 
-  note('the chip could not be removed')
+  note(`the chip was not removed (${attempts.join(', ') || 'no attempt'})`)
   return null
 }

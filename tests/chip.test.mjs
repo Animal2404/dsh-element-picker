@@ -1,49 +1,62 @@
 /**
- * Chip insertion: the DSH-native shape for a pick. The chip is compact in the
- * composer and its codec expands it into the locating block at submit time, so
- * these tests pin both halves — the registration that makes serialization
- * possible, and the guarded insertion that must fall back cleanly when any part
- * of the pipeline is missing.
+ * Chip lifecycle: the chip is the DSH-native shape for a pick (compact in the
+ * composer, expanded by its codec on send), and it carries its own remove
+ * affordance. These tests pin the three halves — registration/insertion, the
+ * remove hit region, and the removal itself, which must delete exactly one chip
+ * and never rewrite the draft.
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { createDocument, createEvent, createWindow } from './helpers/dom-stub.mjs'
 import {
-  CHIP_REMOVE_MARKER,
+  CHIP_SELECTOR,
   CHIP_SOURCE,
+  REMOVE_ZONE_PX,
+  chipIndexOf,
   chipLabel,
-  decorateChips,
+  chipSpan,
   insertElementChip,
   registerChipSource,
   removeChipElement,
+  watchChipRemoval,
 } from '../src/chip.js'
 
 /** The single-line block a chip carries. */
 const BLOCK = '[元素] button "发送" ｜ [选择器] button.x ｜ [源码] …/InputBar.tsx'
 
 /**
- * Build a document with an editable holding one picker chip.
- *
- * @returns {{ doc: object, win: object, input: object, chip: object }} Fixture.
+ * @param {object} target - Window or document stub.
+ * @param {string} type - Event type.
+ * @param {object} event - Event object.
+ * @returns {void}
  */
-function chipFixture() {
+function fire(target, type, event) {
+  for (const handler of target.listeners.get(`${type}:capture`) ?? []) handler(event)
+}
+
+/**
+ * Build a document with an editable holding the given chips.
+ *
+ * @param {number} [count] - How many picker chips to create.
+ * @returns {{ doc: object, win: object, input: object, chips: object[] }} Fixture.
+ */
+function fixture(count = 1) {
   const doc = createDocument()
   const win = createWindow(doc)
-  win.KeyboardEvent = class StubKeyboardEvent {
-    constructor(type, init = {}) {
-      this.type = type
-      Object.assign(this, init)
-    }
-  }
   const input = doc.createElement('div')
   input.setAttribute('data-composer-input', '')
   input.setAttribute('contenteditable', 'true')
-  const chip = doc.createElement('span')
-  chip.setAttribute('data-composer-chip', CHIP_SOURCE)
-  input.appendChild(chip)
   doc.body.appendChild(input)
-  return { doc, win, input, chip }
+
+  const chips = []
+  for (let index = 0; index < count; index += 1) {
+    const chip = doc.createElement('span')
+    chip.setAttribute('data-composer-chip', CHIP_SOURCE)
+    input.appendChild(chip)
+    chips.push(chip)
+  }
+  return { doc, win, input, chips }
 }
 
 /**
@@ -87,9 +100,8 @@ test('the chip source is registered with a codec that expands the block', async 
   assert.equal(source.trigger, '@')
   assert.deepEqual(await source.candidates(), [], 'the source is inert in the @ menu')
 
-  const block = '[元素] button "发送" ｜ [选择器] button.x ｜ [源码] …/InputBar.tsx'
-  assert.equal(source.codec.clipboardText(block), block)
-  assert.equal(await source.codec.serialize(block), block, 'the model receives the block, not the label')
+  assert.equal(source.codec.clipboardText(BLOCK), BLOCK)
+  assert.equal(await source.codec.serialize(BLOCK), BLOCK, 'the model receives the block, not the label')
 })
 
 test('registering without a trigger registry reports failure instead of throwing', () => {
@@ -107,7 +119,7 @@ test('a chip is inserted with the block as both ref and clipboard text', () => {
   const result = insertElementChip({
     ctx,
     sessionId: 'session-1',
-    text: '[元素] button "发送"',
+    text: BLOCK,
     label: '元素 button「发送」',
     onEvent: (message) => events.push(message),
   })
@@ -116,8 +128,8 @@ test('a chip is inserted with the block as both ref and clipboard text', () => {
   assert.equal(calls.inserted.length, 1)
   const { ref, span } = calls.inserted[0]
   assert.equal(ref.source, CHIP_SOURCE)
-  assert.equal(ref.ref, '[元素] button "发送"')
-  assert.equal(ref.clipboardText, ref.ref)
+  assert.equal(ref.ref, BLOCK)
+  assert.equal(ref.clipboardText, BLOCK)
   assert.equal(ref.label, '元素 button「发送」')
   assert.deepEqual(span, { start: 11, end: 11, draftRev: 7 }, 'the span is guarded by the published revision')
   assert.deepEqual(events, [])
@@ -179,64 +191,157 @@ test('the chip label names the tag and clips long text', () => {
   assert.equal(chipLabel(empty), '元素 section')
 })
 
-test('a chip gains an × that swallows the editor event', () => {
-  const { doc, chip } = chipFixture()
+test('a chip is located in the composer order, not just among our own', () => {
+  const { doc, chips } = fixture(1)
+  const foreign = doc.createElement('span')
+  foreign.setAttribute('data-composer-chip', 'reference')
+  doc.body.firstChild.insertBefore(foreign, chips[0])
+
+  assert.equal(chipIndexOf(doc, foreign), 0, 'a user chip still counts towards the index')
+  assert.equal(chipIndexOf(doc, chips[0]), 1)
+  assert.equal(chipIndexOf(doc, doc.createElement('span')), -1)
+})
+
+test('a chip span is derived from the published occurrences', () => {
+  // Occurrences are clipboard coordinates; every chip occupies one detect char.
+  const occurrences = [
+    { offset: 0, length: 10 },
+    { offset: 12, length: 4 },
+  ]
+  assert.deepEqual(chipSpan(occurrences, 0, 7), { start: 0, end: 1, draftRev: 7 })
+  assert.deepEqual(chipSpan(occurrences, 1, 7), { start: 3, end: 4, draftRev: 7 })
+  assert.equal(chipSpan(occurrences, 2, 7), null, 'out of range')
+  assert.equal(chipSpan(occurrences, 0, undefined), null, 'no revision to guard with')
+  assert.equal(chipSpan(undefined, 0, 7), null)
+})
+
+test('a click in the chip remove zone reports that chip and is swallowed', () => {
+  const { doc, win, chips } = fixture(1)
+  const chip = chips[0]
+  chip.getBoundingClientRect = () => ({ left: 100, top: 50, right: 200, bottom: 70, width: 100, height: 20 })
   const removed = []
+  const stop = watchChipRemoval({ doc, win, onRemove: (element) => removed.push(element) })
 
-  assert.equal(decorateChips({ doc, onRemove: (element) => removed.push(element) }), 1)
-  const button = chip.querySelector(`[${CHIP_REMOVE_MARKER}]`)
-  assert.equal(button.textContent, '×')
-  assert.equal(button.getAttribute('contenteditable'), 'false')
-  assert.equal(button.getAttribute('aria-label'), '移除该元素')
-  assert.equal(decorateChips({ doc, onRemove: () => {} }), 0, 'decoration must be idempotent')
-
-  const event = createEvent('click')
-  button.dispatchEvent(event)
-  assert.deepEqual(removed, [chip], 'the × reports the chip it belongs to')
-  assert.equal(event.prevented, true, 'the editor must not also act on the click')
-  assert.equal(event.stopped, true)
+  const inZone = createEvent('mousedown', { target: chip, clientX: 200 - REMOVE_ZONE_PX + 2, clientY: 60 })
+  fire(win, 'mousedown', inZone)
+  assert.deepEqual(removed, [chip])
+  assert.equal(inZone.prevented, true, 'the editor must not also handle the click')
+  assert.equal(inZone.stopped, true)
+  stop()
 })
 
-test('removal uses the editor gesture when the editor honours it', () => {
-  const { doc, win, input, chip } = chipFixture()
-  input.addEventListener('keydown', (event) => {
-    assert.equal(event.key, 'Backspace')
-    chip.remove()
-  })
+test('a click elsewhere on the chip belongs to the editor', () => {
+  const { doc, win, chips } = fixture(1)
+  const chip = chips[0]
+  chip.getBoundingClientRect = () => ({ left: 100, top: 50, right: 200, bottom: 70, width: 100, height: 20 })
+  const removed = []
+  const stop = watchChipRemoval({ doc, win, onRemove: (element) => removed.push(element) })
 
-  assert.equal(removeChipElement({ doc, win, chip }), 'backspace')
+  const middle = createEvent('mousedown', { target: chip, clientX: 140, clientY: 60 })
+  fire(win, 'mousedown', middle)
+  assert.deepEqual(removed, [])
+  assert.equal(middle.prevented, false)
+  stop()
 })
 
-test('removal falls back to the facade when the editor ignores the gesture', () => {
-  const { doc, win, chip } = chipFixture()
-  const drafts = []
+test('the remove zone stays out of the way while selecting', () => {
+  const { doc, win, chips } = fixture(1)
+  const chip = chips[0]
+  chip.getBoundingClientRect = () => ({ left: 100, top: 50, right: 200, bottom: 70, width: 100, height: 20 })
+  const removed = []
+  const stop = watchChipRemoval({ doc, win, onRemove: (element) => removed.push(element), isPickerActive: () => true })
+
+  fire(win, 'mousedown', createEvent('mousedown', { target: chip, clientX: 195, clientY: 60 }))
+  assert.deepEqual(removed, [], 'a pick must never delete a chip')
+  stop()
+})
+
+test('removal consumes the chip through the input machine', () => {
+  const { doc, chips } = fixture(1)
+  const chip = chips[0]
+  const calls = []
   const facade = {
-    state: { getSnapshot: () => ({ draft: `draft text ${BLOCK}` }) },
-    setDraft: (text) => {
-      drafts.push(text)
+    state: { getSnapshot: () => ({ draftRev: 5, occurrences: [{ offset: 0, length: 12 }] }) },
+    consumeToken: (guard) => {
+      calls.push(guard)
       chip.remove()
+      return true
     },
   }
 
-  assert.equal(removeChipElement({ doc, win, chip, facade, blockText: BLOCK }), 'setDraft')
-  assert.deepEqual(drafts, ['draft text '], 'only the chip line is dropped')
+  assert.equal(removeChipElement({ doc, chip, facade }), 'consumeToken:ok')
+  assert.deepEqual(calls, [{ kind: 'span', span: { start: 0, end: 1, draftRev: 5 } }])
+  assert.equal(doc.querySelectorAll(CHIP_SELECTOR).length, 0)
+})
+
+test('a revision race is retried once with a fresh snapshot', () => {
+  const { doc, chips } = fixture(1)
+  const chip = chips[0]
+  let attempt = 0
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 1 + attempt, occurrences: [{ offset: 0, length: 3 }] }) },
+    consumeToken: () => {
+      attempt += 1
+      if (attempt === 1) return false
+      chip.remove()
+      return true
+    },
+  }
+
+  assert.equal(removeChipElement({ doc, chip, facade }), 'consumeToken:refused, consumeToken:ok')
+})
+
+test('the scoped event is used when the facade hides consumeToken', () => {
+  const { doc, chips } = fixture(1)
+  const chip = chips[0]
+  const events = []
+  const actx = {
+    bail: (ctx, name, request) => {
+      events.push({ name, request })
+      chip.remove()
+      return true
+    },
+  }
+  const facade = { state: { getSnapshot: () => ({ draftRev: 2, occurrences: [{ offset: 0, length: 3 }] }) } }
+
+  assert.equal(removeChipElement({ doc, chip, facade, actx }), 'event:ok')
+  assert.equal(events[0].name, 'slash/input-consume-token')
+})
+
+test('removal never rewrites the draft to get rid of a chip', () => {
+  const { doc, chips } = fixture(1)
+  const chip = chips[0]
+  const messages = []
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 2, occurrences: [{ offset: 0, length: 3 }] }) },
+    setDraft: () => {
+      throw new Error('setDraft would flatten the own chips of the user')
+    },
+  }
+
+  assert.equal(removeChipElement({ doc, chip, facade, onEvent: (m) => messages.push(m) }), null)
+  assert.match(messages.join(' '), /neither consumeToken nor the scoped event/)
 })
 
 test('removal reports failure instead of pretending', () => {
-  const { doc, win, chip } = chipFixture()
-  const events = []
+  const { doc, chips } = fixture(1)
+  const chip = chips[0]
+  const messages = []
+  const facade = {
+    state: { getSnapshot: () => ({ draftRev: 2, occurrences: [{ offset: 0, length: 3 }] }) },
+    consumeToken: () => false,
+  }
 
-  assert.equal(removeChipElement({ doc, win, chip, onEvent: (message) => events.push(message) }), null)
-  assert.match(events.join(' '), /ignored a synthetic Backspace/)
-  assert.match(events.join(' '), /could not be removed/)
+  assert.equal(removeChipElement({ doc, chip, facade, onEvent: (m) => messages.push(m) }), null)
+  assert.match(messages.join(' '), /consumeToken:refused/)
+  assert.match(messages.join(' '), /was not removed/)
 })
 
 test('removal is a no-op when no picker chip is present', () => {
   const doc = createDocument()
-  const win = createWindow(doc)
+  const messages = []
   const orphan = doc.createElement('span')
-  const events = []
 
-  assert.equal(removeChipElement({ doc, win, chip: orphan, onEvent: (m) => events.push(m) }), null)
-  assert.match(events.join(' '), /no picker chip is present/)
+  assert.equal(removeChipElement({ doc, chip: orphan, onEvent: (m) => messages.push(m) }), null)
+  assert.match(messages.join(' '), /no picker chip is present/)
 })

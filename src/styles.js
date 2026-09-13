@@ -53,24 +53,22 @@ export const PICKER_CSS = `
   pointer-events: none;
 }
 
-/* The remove affordance on a picker chip (ZCode's picked-element pill has one). */
-[data-dsh-picker-remove] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  margin-left: 3px;
+/* The remove affordance on a picker chip, drawn as a pseudo-element on the chip's
+   own span: the span is React's portal container, so a real injected child would
+   sit outside React's managed tree and could be dropped by a re-render. The
+   matching hit region is handled in JS (see watchChipRemoval). */
+[data-composer-chip="element-picker"]::after {
+  content: "×";
+  margin-left: 4px;
+  padding: 0 2px;
   border-radius: 4px;
   color: #9aa1ac;
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
-  pointer-events: auto;
-  user-select: none;
 }
 
-[data-dsh-picker-remove]:hover {
+[data-composer-chip="element-picker"]:hover::after {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
 }

@@ -129,7 +129,11 @@ function overlayState(page) {
         // The label excludes the injected remove affordance.
         label: (chip.textContent ?? '').replace('×', '').trim(),
       })),
-      removeButtons: document.querySelectorAll('[data-dsh-picker-remove]').length,
+      chipRemoveGlyph: (() => {
+        const chip = document.querySelector('[data-composer-chip="element-picker"]')
+        if (chip === null) return null
+        return getComputedStyle(chip, '::after').content
+      })(),
       draft: document.querySelector('[data-composer-input]').textContent,
     }
   })
@@ -290,21 +294,18 @@ async function runScenario(browser, mode, origin) {
       String(afterInsert.chipCodec),
     )
     check(
-      'the chip carries a remove affordance',
-      inserted.removeButtons === 1,
-      String(inserted.removeButtons),
+      'the chip draws a remove glyph',
+      String(inserted.chipRemoveGlyph ?? '').includes('×'),
+      String(inserted.chipRemoveGlyph),
     )
 
-    // The × drops that chip, like ZCode's picked-element pill.
-    await page.click('[data-dsh-picker-remove]')
-    await page.waitForTimeout(300)
+    // The × drops that chip, like ZCode's picked-element pill: a real click in
+    // the chip's right-hand remove region.
+    const chipBox = await page.locator('[data-composer-chip="element-picker"]').boundingBox()
+    await page.mouse.click(chipBox.x + chipBox.width - 4, chipBox.y + chipBox.height / 2)
+    await page.waitForTimeout(400)
     const afterRemove = await overlayState(page)
-    check('the × removed the chip', afterRemove.chips.length === 0, JSON.stringify(afterRemove.chips))
-    check(
-      'the remove affordance went with the chip',
-      afterRemove.removeButtons === 0,
-      String(afterRemove.removeButtons),
-    )
+    check('clicking the × removed the chip', afterRemove.chips.length === 0, JSON.stringify(afterRemove.chips))
     await shot('04b-chip-removed')
   } else if (mode === 'paste') {
     check('the shell paste path was chosen', afterInsert.calls.paste === 1, JSON.stringify(afterInsert.calls))

@@ -79,7 +79,12 @@ for (const line of css.split('\n')) {
   const trimmed = line.trim()
   const isSelector = trimmed.endsWith('{') && !trimmed.startsWith('@')
   if (!isSelector) continue
-  const namespaced = trimmed.includes('#dsh-element-picker-root') || trimmed.includes('[data-dsh-picker')
+  // The chip selector is namespaced by the reference source name this plugin
+  // registers, which is just as unambiguous as a data attribute of our own.
+  const namespaced =
+    trimmed.includes('#dsh-element-picker-root') ||
+    trimmed.includes('[data-dsh-picker') ||
+    trimmed.includes('[data-composer-chip="element-picker"]')
   check(namespaced, `src/styles.js: CSS selector is not namespaced: ${trimmed}`)
 }
 
