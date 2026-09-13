@@ -29,6 +29,7 @@ export const SOURCE_FILES = [
   'describe.js',
   'insert.js',
   'chip.js',
+  'transcript.js',
   'overlay.js',
   'plugin.js',
 ]

@@ -13,6 +13,7 @@ import React from 'react'
 
 import { chipLabel, insertElementChip, registerChipSource, removeChipElement, resolveInputBinding, watchChipRemoval } from './chip.js'
 import { buildElementBlock } from './describe.js'
+import { watchTranscript } from './transcript.js'
 import { insertBlock } from './insert.js'
 import { createPicker } from './overlay.js'
 import { installStyles } from './styles.js'
@@ -495,6 +496,10 @@ function applyPicker(ctx) {
     ),
   )
 
+  // Sent element blocks fold into pills in the transcript (the message text is
+  // untouched; this is how it renders).
+  const stopWatchingTranscript = watchTranscript({ doc, win, onEvent: (message) => log(message) })
+
   const stopWatchingChips = watchChipRemoval({
     doc,
     win,
@@ -503,6 +508,7 @@ function applyPicker(ctx) {
   })
 
   ctx.effect(() => () => {
+    stopWatchingTranscript()
     stopWatchingChips()
     picker.dispose()
     PICKER_STATE.picker = null

@@ -108,6 +108,19 @@ function overlayState(page) {
         width: Number.parseFloat(highlight.style.width),
         height: Number.parseFloat(highlight.style.height),
       },
+      transcriptPills: document.querySelectorAll('[data-dsh-picker-transcript-pill]').length,
+      transcriptFoldedLines: document.querySelectorAll('[data-dsh-picker-folded]').length,
+      transcriptPillText: (() => {
+        const pill = document.querySelector('[data-dsh-picker-transcript-pill]')
+        return pill === null ? '' : pill.textContent.trim()
+      })(),
+      transcriptHiddenLines: [...document.querySelectorAll('#transcript p')].filter(
+        (line) => getComputedStyle(line).display === 'none',
+      ).length,
+      transcriptLineText: (() => {
+        const line = document.getElementById('sent-line-6')
+        return line === null ? '' : line.textContent.trim()
+      })(),
       infoVisible: (() => {
         const card = document.querySelector('[data-dsh-picker-ui="info"]')
         if (card === null) return false
@@ -222,6 +235,21 @@ async function runScenario(browser, mode, origin) {
   check('the entry id is element-picker', harness.mounted?.id === 'element-picker', JSON.stringify(harness.mounted))
   check('the registered component renders into its slot host', boot.slotButtons === 1, `slot buttons: ${boot.slotButtons}`)
   check('the overlay is mounted', boot.present === true)
+  check(
+    'a sent element block is folded into a pill',
+    boot.transcriptPills === 1 && boot.transcriptFoldedLines === 7,
+    JSON.stringify({ pills: boot.transcriptPills, folded: boot.transcriptFoldedLines }),
+  )
+  check(
+    'the pill carries the element summary',
+    /完全权限/.test(boot.transcriptPillText ?? '') && !/\[元素\]/.test(boot.transcriptPillText ?? ''),
+    String(boot.transcriptPillText),
+  )
+  check(
+    'the folded lines are hidden but still in the document',
+    boot.transcriptHiddenLines === 7 && boot.transcriptLineText !== '',
+    JSON.stringify({ hidden: boot.transcriptHiddenLines }),
+  )
   check('selection mode starts off', boot.active === 'false', String(boot.active))
   check('the hint stays hidden until selecting', boot.hintVisible === false, String(boot.hintVisible))
   check('the info card stays hidden until hovering', boot.infoVisible === false, String(boot.infoVisible))

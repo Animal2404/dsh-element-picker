@@ -174,6 +174,45 @@ export const PICKER_CSS = `
   }
 }
 
+/* A sent element block folded into a pill. The tokens are DSH's own chip
+   tokens (interactive-bg-hover surface, business-primary text, 22px pill), so
+   the transcript pill matches the composer chip exactly. */
+[data-dsh-picker-transcript-pill] {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  max-width: 240px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--dsw-alias-state-business-primary, #4d6bfe);
+  font-size: 13px;
+  line-height: 22px;
+  vertical-align: bottom;
+  cursor: pointer;
+  user-select: none;
+}
+
+[data-dsh-picker-transcript-pill]:hover {
+  background: var(--dsw-alias-bg-layer-3, rgba(255, 255, 255, 0.1));
+}
+
+[data-dsh-picker-pill-label] {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-dsh-picker-pill-glyph] {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+[data-dsh-picker-transcript-pill][aria-expanded="true"] [data-dsh-picker-pill-glyph] {
+  transform: rotate(90deg);
+}
+
 /* The remove affordance on a picker chip, drawn as a pseudo-element on the chip's
    own span: the span is React's portal container, so a real injected child would
    sit outside React's managed tree and could be dropped by a re-render. The

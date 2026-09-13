@@ -74,6 +74,10 @@ function matchesCompound(node, compound) {
  * @returns {boolean} Whether the node matches.
  */
 export function matchesSelector(node, selector) {
+  // A comma-separated list matches when any of its selectors matches.
+  if (selector.includes(',')) {
+    return selector.split(',').some((part) => matchesSelector(node, part.trim()))
+  }
   const compounds = selector.split('>').map((part) => part.trim())
   if (compounds.length === 0) return false
   let current = node

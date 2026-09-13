@@ -123,6 +123,16 @@ It emits: — `[元素] [选择器] [XPath] [位置] [样式] [属性] [源码] 
 [HTML] <button aria-label="发送消息" data-phase="idle">发送</button>
 ```
 
+## In the transcript
+
+A sent message holds the full block (that is what the model reads). The
+transcript would therefore render eight lines of locating detail in the
+conversation, so the plugin folds them into a pill that matches DSH's own chip
+styling, with a click to bring the block back. This is presentation only: DSH
+gives a plugin no way to register how a sent message renders, so the fold wraps
+the already-rendered lines rather than changing the message — the text stays in
+the DOM and the model's view is untouched.
+
 ## Insertion
 
 The composer is a Lexical `contenteditable` (`[data-composer-input]`), and the
