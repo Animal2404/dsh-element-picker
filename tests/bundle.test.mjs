@@ -123,7 +123,11 @@ test('the overlay and the stylesheet are installed by apply, and disposed by the
   assert.equal(doc.getElementById('dsh-element-picker-style') !== null, true, 'styles installed')
   assert.equal(doc.querySelectorAll('[data-dsh-picker-ui="button"]').length, 1, 'floating button mounted')
 
-  for (const teardown of teardowns) teardown()
+  // `ctx.effect(fn)` runs fn, and the function fn returns is the disposer.
+  for (const register of teardowns) {
+    const dispose = register()
+    if (typeof dispose === 'function') dispose()
+  }
   assert.equal(doc.getElementById('dsh-element-picker-style'), null, 'styles removed on dispose')
   assert.equal(doc.querySelectorAll('[data-dsh-picker-ui="button"]').length, 0, 'overlay removed on dispose')
 })

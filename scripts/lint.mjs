@@ -66,13 +66,21 @@ for (const [name, text] of texts) {
 }
 
 // 5. Overlay styles stay namespaced and non-invasive.
-const css = texts.get('styles.js') ?? ''
+//
+// The stylesheet lives inside `src/styles.js` as the PICKER_CSS template
+// literal, so the checks run over the extracted CSS text rather than the whole
+// module (which also contains prose about the rules).
+const styleModule = texts.get('styles.js') ?? ''
+const cssMatch = /export const PICKER_CSS = `([\s\S]*?)`/.exec(styleModule)
+check(cssMatch !== null, 'src/styles.js: could not locate the PICKER_CSS template literal')
+const css = cssMatch === null ? '' : cssMatch[1]
 check(!/!important/.test(css), 'src/styles.js: must not use !important (no fighting the app styles)')
-for (const [index, line] of css.split('\n').entries()) {
-  const isSelector = line.trim().endsWith('{') && !line.trim().startsWith('@')
+for (const line of css.split('\n')) {
+  const trimmed = line.trim()
+  const isSelector = trimmed.endsWith('{') && !trimmed.startsWith('@')
   if (!isSelector) continue
-  const namespaced = line.includes('#dsh-element-picker-root') || line.includes('[data-dsh-picker')
-  check(namespaced, `src/styles.js:${index + 1}: selector is not namespaced: ${line.trim()}`)
+  const namespaced = trimmed.includes('#dsh-element-picker-root') || trimmed.includes('[data-dsh-picker')
+  check(namespaced, `src/styles.js: CSS selector is not namespaced: ${trimmed}`)
 }
 
 // 6. The entry must export exactly what the loader wrapper publishes.

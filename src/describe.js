@@ -17,11 +17,7 @@
  * assert the exact output against a stub element.
  */
 import { HOOK_SOURCES, sourceFor } from './hooks-map.js'
-import {
-  describeElement,
-  generateSelector,
-  generateXPath,
-} from './selector.js'
+import { describeElement, generateSelector, generateXPath } from './selector.js'
 
 /** Attributes worth quoting next to the selector. */
 const REPORTED_ATTRIBUTES = [
