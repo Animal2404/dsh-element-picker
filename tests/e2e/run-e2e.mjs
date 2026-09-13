@@ -347,8 +347,8 @@ async function runScenario(browser, mode, origin) {
   // Finishing the selection is what returns clicks to the application.
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
-  const escaped = await overlayState(page)
-  check('Escape finishes the selection', escaped.active === 'false', String(escaped.active))
+  const afterFinish = await overlayState(page)
+  check('Escape finishes the selection', afterFinish.active === 'false', String(afterFinish.active))
 
   // With selection mode off, the application works normally again.
   await page.click('#sidebar-toggle')
@@ -365,9 +365,9 @@ async function runScenario(browser, mode, origin) {
   await page.click('[data-dsh-picker-ui="slot-button"]')
   await page.keyboard.press('Escape')
   await page.waitForTimeout(100)
-  const escaped = await overlayState(page)
-  check('Escape leaves selection mode', escaped.active === 'false', String(escaped.active))
-  check('Escape inserts nothing', escaped.draft === draftBeforeEscape, escaped.draft.slice(-40))
+  const cancelled = await overlayState(page)
+  check('Escape leaves selection mode', cancelled.active === 'false', String(cancelled.active))
+  check('Escape inserts nothing', cancelled.draft === draftBeforeEscape, cancelled.draft.slice(-40))
   await shot('05-escape-cancelled')
 
   check('the page raised no errors', pageErrors.length === 0, pageErrors.join(' | '))
