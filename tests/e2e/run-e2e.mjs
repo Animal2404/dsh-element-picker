@@ -142,6 +142,10 @@ function overlayState(page) {
         // The label excludes the injected remove affordance.
         label: (chip.textContent ?? '').replace('×', '').trim(),
       })),
+      slotBackground: (() => {
+        const slot = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+        return slot === null ? null : getComputedStyle(slot).backgroundColor
+      })(),
       slotRing: (() => {
         const slot = document.querySelector('[data-dsh-picker-ui="slot-button"]')
         if (slot === null) return null
@@ -151,6 +155,7 @@ function overlayState(page) {
           conic: (style.backgroundImage ?? '').includes('conic-gradient'),
           composite: style.maskComposite || style.webkitMaskComposite || '',
           animation: style.animationName,
+          duration: style.animationDuration,
           playState: style.animationPlayState,
         }
       })(),
@@ -234,16 +239,23 @@ async function runScenario(browser, mode, origin) {
     String(boot.slotRing?.composite),
   )
   check(
-    'the ring is idle until hovered',
-    boot.slotRing?.playState === 'paused' && /rotate-hue/.test(boot.slotRing?.animation ?? ''),
+    'the ring turns slowly without being hovered',
+    boot.slotRing?.playState === 'running' &&
+      boot.slotRing?.duration === '3s' &&
+      /rotate-hue/.test(boot.slotRing?.animation ?? ''),
     JSON.stringify(boot.slotRing),
   )
   await shot('01-boot')
 
-  // Hovering the control animates the ring.
+  // Hovering must not change the control's look, and neither must activating it.
   await page.hover('[data-dsh-picker-ui="slot-button"]')
   const ringHovered = await overlayState(page)
-  check('the ring animates while hovered', ringHovered.slotRing?.playState === 'running', JSON.stringify(ringHovered.slotRing))
+  check('the ring keeps turning while hovered', ringHovered.slotRing?.playState === 'running', JSON.stringify(ringHovered.slotRing))
+  check(
+    'hovering does not repaint the control',
+    ringHovered.slotBackground === boot.slotBackground,
+    JSON.stringify({ idle: boot.slotBackground, hovered: ringHovered.slotBackground }),
+  )
 
   // The single control toggles the state, twice in a row.
   await page.click('[data-dsh-picker-ui="slot-button"]')
@@ -258,6 +270,16 @@ async function runScenario(browser, mode, origin) {
   const active = await overlayState(page)
   check('the tool-row control enters selection mode', active.active === 'true', String(active.active))
   check('the tool-row control shows its active state', active.slotPressed === 'true', String(active.slotPressed))
+  check(
+    'activating the control does not repaint it',
+    active.slotBackground === boot.slotBackground,
+    JSON.stringify({ idle: boot.slotBackground, active: active.slotBackground }),
+  )
+  check(
+    'the ring keeps turning after the click',
+    active.slotRing?.playState === 'running',
+    JSON.stringify(active.slotRing),
+  )
   check('the hint bar is visible in selection mode', active.hintVisible === true)
   check(
     'the hint sits above the composer instead of covering it',

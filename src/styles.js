@@ -142,15 +142,11 @@ export const PICKER_CSS = `
   mask-composite: exclude;
   -webkit-mask-composite: destination-out;
   filter: hue-rotate(0);
-  animation: dsh-picker-rotate-hue linear 500ms infinite;
-  animation-play-state: paused;
-  pointer-events: none;
-}
-
-/* Running while hovered, and while the picker is actually selecting. */
-[data-dsh-picker-ui="slot-button"]:hover::after,
-[data-dsh-picker-ui="slot-button"][aria-pressed="true"]::after {
+  /* Slow and always on: the ring is the control's only state cue, so it turns
+     before the click (inviting one) and keeps turning after it. */
+  animation: dsh-picker-rotate-hue linear 3s infinite;
   animation-play-state: running;
+  pointer-events: none;
 }
 
 [data-dsh-picker-ui="slot-button"]:active {

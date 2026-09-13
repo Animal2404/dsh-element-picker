@@ -105,6 +105,9 @@ function PickerButton(props) {
       'aria-label': '选择界面元素加入聊天',
       'aria-pressed': active ? 'true' : 'false',
       title: '选择界面元素加入聊天（Ctrl+Shift+E 切换，菜单内选择请用快捷键进入选择模式）',
+      // The control keeps exactly one look in every state: the ring carries the
+      // feedback, and a background swap on press was reading as a different
+      // button. State still rides `aria-pressed` for assistive tech.
       style: {
         display: 'inline-flex',
         alignItems: 'center',
@@ -114,8 +117,8 @@ function PickerButton(props) {
         padding: 0,
         border: 'none',
         borderRadius: 6,
-        background: active ? '#4d6bfe' : 'transparent',
-        color: active ? '#ffffff' : 'inherit',
+        background: 'transparent',
+        color: 'inherit',
         cursor: 'pointer',
       },
     },
