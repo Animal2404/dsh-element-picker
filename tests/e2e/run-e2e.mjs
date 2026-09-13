@@ -157,7 +157,9 @@ async function runScenario(browser, mode, origin) {
 
   console.log(`\n[${mode}]`)
   await page.goto(`${origin}/?mode=${mode}`)
-  await page.waitForSelector('[data-dsh-picker-ui="root"]')
+  // The overlay is a zero-size, pointer-events:none layer, so Playwright would
+  // never call it "visible": wait for it to exist.
+  await page.waitForSelector('[data-dsh-picker-ui="root"]', { state: 'attached' })
 
   const boot = await overlayState(page)
   const harness = await harnessState(page)

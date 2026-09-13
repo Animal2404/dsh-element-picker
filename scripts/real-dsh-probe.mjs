@@ -139,6 +139,7 @@ function snapshot(page) {
       composerEditable: composer !== null && composer.getAttribute('contenteditable') === 'true',
       textareas: document.querySelectorAll('textarea').length,
       hasCard: document.querySelector('[data-composer-card]') !== null,
+      pickerRoot: document.querySelector('[data-dsh-picker-ui="root"]') !== null,
       pickerOwnButtons: document.querySelectorAll('[data-dsh-picker-ui="button"]').length,
       pickerSlotButton: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
       buttons: [...document.querySelectorAll('button, [role="button"]')].map(describe),
