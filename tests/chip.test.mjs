@@ -598,7 +598,7 @@ test('the outer delete clears every picked element in one call', () => {
   assert.equal(calls[0].start > calls[1].start && calls[1].start > calls[2].start, true, 'removed from the end backwards')
   assert.equal(chips.length, 1, 'a foreign chip is left alone')
   assert.equal(chips[0].source, 'other-source')
-  assert.match(events.join(' '), /cleared 3 of 3 picked chips/)
+  assert.match(events.join(' '), /cleared 3 of 3 picked chips via "consumeToken"/)
 })
 
 test('clearing with nothing picked reports rather than throws', () => {

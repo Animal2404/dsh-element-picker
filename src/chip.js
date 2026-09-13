@@ -371,9 +371,10 @@ function pickerChips(facade) {
  * @param {number} options.count - How many chips to remove.
  * @param {string} options.what - Word for the diagnostics, e.g. 'grouping'.
  * @param {(message: string) => void} options.note - Diagnostics sink.
+ * @param {string[]} [options.routes] - Collects the verb each chip was removed with.
  * @returns {boolean} Whether every requested chip went away.
  */
-function consumeSpans({ facade, actx, count, what, note }) {
+function consumeSpans({ facade, actx, count, what, note, routes }) {
   for (let remaining = count; remaining > 0; remaining -= 1) {
     const state = pickerChips(facade)
     if (state.mine.length === 0) break
@@ -387,8 +388,10 @@ function consumeSpans({ facade, actx, count, what, note }) {
     try {
       if (typeof facade.consumeToken === 'function') {
         applied = facade.consumeToken({ kind: 'span', span }) === true
+        if (applied && Array.isArray(routes)) routes.push('consumeToken')
       } else if (actx !== null && actx !== undefined && typeof actx.bail === 'function') {
         applied = actx.bail(actx, 'slash/input-consume-token', { guard: { kind: 'span', span } }) === true
+        if (applied && Array.isArray(routes)) routes.push('scoped-event')
       }
     } catch (error) {
       note(`${what} removal threw: ${String(error)}`)
@@ -425,16 +428,19 @@ export function removeAllChips({ ctx, sessionId, onEvent }) {
     note('clearing found no picked chips')
     return { removed: 0, before: 0 }
   }
+  const routes = []
   const ok = consumeSpans({
     facade: binding.facade,
     actx: binding.actx,
     count: before,
     what: 'clearing',
     note,
+    routes,
   })
   if (!ok) return null
   const after = pickerChips(binding.facade).mine.length
-  note(`cleared ${before - after} of ${before} picked chips`)
+  const how = routes.length === 0 ? 'no attempt' : [...new Set(routes)].join('+')
+  note(`cleared ${before - after} of ${before} picked chips via "${how}"`)
   return { removed: before - after, before }
 }
 

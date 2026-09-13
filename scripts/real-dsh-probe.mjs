@@ -656,7 +656,7 @@ await step('the chip x removes the chip', async () => {
 
   const after = await page.evaluate(() => document.querySelectorAll('[data-composer-chip="element-picker"]').length)
   must('clicking the x removes that chip', after === before - 1, `${before} -> ${after}`)
-  const removed = pluginLog.some((line) => line.includes('removed a chip via'))
+  const removed = pluginLog.some((line) => line.includes('cleared') && line.includes('via'))
   must('the removal reported the route it used', removed, pluginLog.slice(-3).join(' | '))
   await page.screenshot({ path: join(out, '11-chip-removed.png') })
 })
