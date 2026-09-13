@@ -144,6 +144,18 @@ function snapshot(page) {
       pickerSlotButton: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
       buttons: [...document.querySelectorAll('button, [role="button"]')].map(describe),
       sessionRows: document.querySelectorAll('[data-session-id]').length,
+      header: (() => {
+        const header = document.querySelector('header')
+        const host = document.querySelector('[data-slot="conversation.session.header.utilities"]')
+        const actions = document.querySelector('[data-slot="conversation.session.header.actions"]')
+        return {
+          present: header !== null,
+          utilitiesHost: host !== null,
+          utilitiesChildren: host === null ? null : host.children.length,
+          utilitiesHtml: host === null ? null : host.innerHTML.slice(0, 140),
+          actionsChildren: actions === null ? null : actions.children.length,
+        }
+      })(),
     }
   })
 }
