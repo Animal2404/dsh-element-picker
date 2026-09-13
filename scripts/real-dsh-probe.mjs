@@ -225,6 +225,106 @@ if (dom.pickerSlotButton === 0) {
 }
 
 // ------------------------------------------------------- the interaction itself
+/**
+ * Dump the page's interactive affordances, so an unknown UI can be driven from
+ * evidence instead of guesses.
+ *
+ * @param {import('playwright').Page} page - Page under test.
+ * @returns {Promise<object>} Buttons, inputs, and composer state.
+ */
+function affordances(page) {
+  return page.evaluate(() => {
+    const describe = (element) => ({
+      tag: element.tagName.toLowerCase(),
+      label: element.getAttribute('aria-label'),
+      title: element.getAttribute('title'),
+      text: (element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40),
+      disabled: element.hasAttribute('disabled'),
+    })
+    const composer = document.querySelector('[data-composer-input]')
+    return {
+      buttons: [...document.querySelectorAll('button, [role="button"]')].map(describe),
+      inputs: [...document.querySelectorAll('input, [data-composer-input]')].map((element) => ({
+        ...describe(element),
+        contenteditable: element.getAttribute('contenteditable'),
+        phase: element.getAttribute('data-phase'),
+      })),
+      composerEditable: composer !== null && composer.getAttribute('contenteditable') === 'true',
+      slotEntries: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
+      sessionRows: document.querySelectorAll('[data-session-id], [role="listitem"]').length,
+    }
+  })
+}
+
+/**
+ * Click the first affordance matching a predicate, if any.
+ *
+ * @param {import('playwright').Page} page - Page under test.
+ * @param {(item: object) => boolean} predicate - Match against an affordance.
+ * @returns {Promise<string | null>} What was clicked, else null.
+ */
+async function clickAffordance(page, predicate) {
+  const map = await affordances(page)
+  const match = map.buttons.find(predicate) ?? map.inputs.find(predicate)
+  if (match === undefined) return null
+  if (match.tag === 'button' || match.tag === '[role="button"]') {
+    await page.getByRole('button', { name: match.text === '' ? match.label : match.text }).first().click()
+  } else {
+    await page.locator('button', { hasText: match.text }).first().click()
+  }
+  return match.label ?? match.text
+}
+
+// ------------------------------------------------------- dismiss first-run UI
+const notice = await clickAffordance(page, (item) => item.text === 'Continue' || item.label === 'Continue')
+if (notice !== null) {
+  say(`dismissed the first-run notice via "${notice}"`)
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: join(out, '02-after-notice.png') })
+} else {
+  skip('dismissing the first-run notice', 'no Continue affordance found')
+}
+
+const map = await affordances(page)
+say(`affordances after the notice: ${JSON.stringify(map, null, 2)}`)
+await writeFile(join(out, 'affordances.json'), JSON.stringify(map, null, 2))
+
+// ------------------------------------------------------------- create session
+if (!map.composerEditable) {
+  const created = await clickAffordance(page, (item) =>
+    /new session|新建会话/i.test(`${item.label ?? ''} ${item.text ?? ''}`),
+  )
+  if (created === null) {
+    skip('creating a session', 'no New Session affordance found')
+  } else {
+    say(`started a session via "${created}"`)
+    await page.waitForTimeout(3000)
+    await page.screenshot({ path: join(out, '03-new-session.png') })
+  }
+}
+
+const afterSession = await affordances(page)
+say(`composer editable after the attempt: ${afterSession.composerEditable}`)
+say(`composer-row entries: ${afterSession.slotEntries}`)
+await writeFile(join(out, 'affordances-after-session.json'), JSON.stringify(afterSession, null, 2))
+
+if (afterSession.composerEditable) {
+  say('PASS  the real composer becomes editable with a session')
+} else {
+  skip(
+    'an editable composer',
+    'no workspace/session could be created headlessly, so the composer stays inert',
+  )
+}
+if (afterSession.slotEntries === 1) {
+  say('PASS  the composer-row entry renders inside a live session')
+} else if (afterSession.composerEditable) {
+  must('the composer-row entry renders inside a live session', false, `found ${afterSession.slotEntries}`)
+} else {
+  skip('the composer-row entry', 'no live session to host the session-scoped slot')
+}
+
+// ---------------------------------------------------------- pick and insert
 let picked = null
 if (dom.pickerButton === 1) {
   await page.click('[data-dsh-picker-ui="button"]')
@@ -248,7 +348,7 @@ if (dom.pickerButton === 1) {
       }
     })
     say(`highlight over the composer card: ${JSON.stringify(highlight)}`)
-    await page.screenshot({ path: join(out, '02-real-dsh-hover.png') })
+    await page.screenshot({ path: join(out, '04-real-dsh-hover.png') })
 
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
     await page.waitForTimeout(1000)
@@ -256,7 +356,7 @@ if (dom.pickerButton === 1) {
       const composer = document.querySelector('[data-composer-input]')
       return composer === null ? null : composer.textContent
     })
-    await page.screenshot({ path: join(out, '03-real-dsh-after-pick.png') })
+    await page.screenshot({ path: join(out, '05-real-dsh-after-pick.png') })
   } else {
     skip('picking an element', 'no [data-composer-card] in the real DOM')
   }
