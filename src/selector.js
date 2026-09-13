@@ -273,14 +273,18 @@ export function isInteractive(element) {
 /**
  * Whether the element identifies itself well enough to be the pick target.
  *
+ * An `id` is deliberately NOT a criterion: DSH mounts its whole app under
+ * `div#root`, so stopping on any id made a click on a session header select the
+ * entire application — the same trap as the generic markers, one attribute over.
+ * An id remains useful when *generating a selector* for an element that was
+ * already chosen (see `STABLE_ATTRIBUTES`).
+ *
  * @param {Element} element - Candidate element.
- * @returns {boolean} True for component hooks, ids, and controls.
+ * @returns {boolean} True for component hooks and controls.
  */
 export function hasStableHook(element) {
   if (element === null || element.nodeType !== 1) return false
   if (TARGET_HOOKS.some((attr) => element.getAttribute(attr) !== null)) return true
-  const id = element.getAttribute('id')
-  if (id !== null && ID_SAFE.test(id)) return true
   return isInteractive(element)
 }
 
@@ -288,11 +292,10 @@ export function hasStableHook(element) {
  * Resolve the element the user means.
  *
  * The pointer usually lands on a leaf (an icon's `<path>`, a label `<span>`),
- * so the ancestry is searched for the nearest component hook, id, or control —
- * that is what turns "the arrow glyph" into "the send button". When nothing in
- * the ancestry identifies anything, the element under the pointer IS the
- * answer: climbing further is what made a click inside a panel select the whole
- * panel.
+ * so the ancestry is searched for the nearest component hook or control — that
+ * is what turns "the arrow glyph" into "the send button". When nothing in the
+ * ancestry identifies anything, the element under the pointer IS the answer:
+ * climbing further is what made a click inside a panel select the whole panel.
  *
  * @param {Element} element - Element under the pointer.
  * @param {Document} doc - Owning document.

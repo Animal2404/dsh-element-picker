@@ -100,7 +100,7 @@ test('XPath is absolute and counts same-tag siblings', () => {
   assert.equal(generateXPath(plain), '/html/body/span')
 })
 
-test('targets are hooks, ids, and controls — not every marked container', () => {
+test('targets are component hooks and controls — not every marked container', () => {
   const { doc, card, input, send, plain } = fixture()
   assert.equal(hasStableHook(card), true, 'a composer hook is a target')
   assert.equal(hasStableHook(input), true)
@@ -120,6 +120,27 @@ test('targets are hooks, ids, and controls — not every marked container', () =
   assert.equal(hasStableHook(panel), false, 'data-phase is not a target hook')
   assert.equal(resolveTarget(title, doc), title, 'the pointed-at element wins')
   assert.equal(resolveTarget(panel, doc), panel)
+})
+
+test('an application mount point does not capture everything inside it', () => {
+  const doc = createDocument()
+  // DSH mounts the whole app under #root; stopping the climb on any id made a
+  // click on a session header outline the entire application.
+  const mount = doc.createElement('div')
+  mount.setAttribute('id', 'root')
+  const panel = doc.createElement('div')
+  panel.setAttribute('data-phase', 'active')
+  const header = doc.createElement('header')
+  const title = doc.createElement('h2')
+  title.textContent = 'session title'
+  header.appendChild(title)
+  panel.appendChild(header)
+  mount.appendChild(panel)
+  doc.body.appendChild(mount)
+
+  assert.equal(hasStableHook(mount), false, 'a mount point is not a target')
+  assert.equal(resolveTarget(header, doc), header, 'the header stays the header')
+  assert.equal(resolveTarget(title, doc), title, 'a plain title stays itself')
 })
 
 test('a pick resolves upward to the nearest hooked element', () => {
