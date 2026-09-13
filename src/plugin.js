@@ -358,15 +358,32 @@ function insertPickedElement(element, detailed = false) {
   }
 
   if (detailed !== true && PICKER_STATE.chipReady === true) {
+    // The chip is a short label in the composer, but what it stands for — and
+    // therefore what the model receives on send — is the FULL block: selector,
+    // XPath, geometry, computed style, attributes, source, and an HTML excerpt.
+    // The composer stays clean because none of that is rendered there.
+    let payload = text
+    try {
+      payload = buildElementBlock(element, {
+        doc,
+        win,
+        scroll: { x: win?.scrollX ?? 0, y: win?.scrollY ?? 0 },
+        detailed: true,
+      })
+    } catch (error) {
+      log('falling back to the compact payload:', String(error))
+    }
+
     const chip = insertElementChip({
       ctx,
       sessionId,
-      text,
+      text: payload,
       label: chipLabel(element),
       onEvent: (message) => log(message),
     })
     if (chip !== null) {
-      log(`inserted a ${chip} for ${element.tagName.toLowerCase()}`)
+      const lines = payload.split(String.fromCharCode(10)).filter((line) => line !== '').length
+      log(`inserted a ${chip} for ${element.tagName.toLowerCase()} carrying a ${lines}-line block`)
       return
     }
   }

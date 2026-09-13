@@ -594,6 +594,12 @@ if (picked !== null && picked.chipSource !== null) {
     'the chip codec was registered, so the block can serialize on send',
     !pluginLog.join(' ').includes('chip codec not registered'),
   )
+  const carried = pluginLog.join(' ').match(/carrying a (\d+)-line block/)
+  must(
+    'the chip carries the full block for the model, not the one-liner',
+    carried !== null && Number(carried[1]) >= 5,
+    carried === null ? pluginLog.slice(-3).join(' | ') : `carried ${carried[1]} lines`,
+  )
 } else if (picked !== null && picked.inner.includes('[元素]')) {
   await writeFile(join(out, 'composer-after-pick.html'), picked.html)
   say('NOTE  the chip path was unavailable; the compact text fallback was used')
