@@ -107,11 +107,21 @@ export const PICKER_CSS = `
    ring); this control is a 28x28 icon button, so the ring is 2px and its radius
    matches the control's own 6px, which is what keeps the ring hugging its edge.
    The radius and width stay custom properties, so tuning is one value. */
+[data-dsh-picker-ui="slot-anchor"] {
+  position: relative;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 [data-dsh-picker-ui="slot-button"] {
   --dsh-picker-ring-width: 2px;
   --dsh-picker-ring-radius: 6px;
   position: relative;
   z-index: 2;
+  /* The zero-size anchor is pointer-events:none so it never intercepts the
+     footer; the control itself must stay clickable. */
+  pointer-events: auto;
 }
 
 [data-dsh-picker-ui="slot-button"]::after {

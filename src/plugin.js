@@ -27,8 +27,24 @@ import { installStyles } from './styles.js'
  */
 export const SLOT = 'sidebar.footer.action'
 
-/** Order within that list; lower sorts further left. */
-export const ENTRY_ORDER = 100
+/**
+ * Order within that list; lower sorts first.
+ *
+ * DSH sorts these entries ascending, and the Bash widget registers at 10 — so
+ * this lands immediately after it, which is the line our control is offset from
+ * (see POSITION_SELECTORS).
+ */
+export const ENTRY_ORDER = 11
+
+/**
+ * What the control aligns itself beside, in order of preference.
+ *
+ * The footer is a wrapping flex row, and the Bash widget's wrapper claims the
+ * full row width, so an entry that takes part in that flow can only ever end up
+ * on the next line. The control is therefore offset out of the flow onto that
+ * row's right-hand end, re-measured as the footer changes instead of assumed.
+ */
+export const POSITION_SELECTORS = ['.sbw-wrap', '[class*="footerActions"]', '[class*="footArea"]']
 
 /** Services this plugin's browser half consumes (declared in package.json too). */
 
@@ -37,6 +53,9 @@ export const ENTRY_ID = 'element-picker'
 
 /** Console prefix for every diagnostic this plugin prints. */
 export const LOG_PREFIX = '[dsh-element-picker]'
+
+/** Edge length of the control, in px. */
+export const CONTROL_SIZE = 28
 
 /**
  * Cordis services this plugin needs.
@@ -87,6 +106,8 @@ function PointerIcon() {
  * @returns {unknown} A React element.
  */
 function PickerButton(props) {
+  const anchorRef = React.useRef(null)
+  const [offset, setOffset] = React.useState({ dx: 0, dy: 0 })
   const inputActions = props.inputActions
   const state = PICKER_STATE
   state.inputActions = inputActions
@@ -106,9 +127,52 @@ function PickerButton(props) {
     if (state.picker !== null) state.picker.toggle()
   }, [])
 
+  React.useLayoutEffect(() => {
+    let queued = false
+    const measure = () => {
+      queued = false
+      const anchor = anchorRef.current
+      if (anchor === null) return
+      let target = null
+      for (const selector of POSITION_SELECTORS) {
+        target = anchor.ownerDocument.querySelector(selector)
+        if (target !== null) break
+      }
+      if (target === null) {
+        setOffset({ dx: 0, dy: 0 })
+        return
+      }
+      const row = target.getBoundingClientRect()
+      const here = anchor.getBoundingClientRect()
+      const size = CONTROL_SIZE
+      setOffset({
+        dx: Math.round(row.right - 6 - size - here.left),
+        dy: Math.round(row.top + (row.height - size) / 2 - here.top),
+      })
+    }
+    const schedule = () => {
+      if (queued) return
+      queued = true
+      if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(measure)
+      else setTimeout(measure, 16)
+    }
+
+    measure()
+    window.addEventListener('resize', schedule)
+    const observer = new MutationObserver(schedule)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => {
+      window.removeEventListener('resize', schedule)
+      observer.disconnect()
+    }
+  }, [])
+
   return React.createElement(
-    'button',
-    {
+    'div',
+    { ref: anchorRef, 'data-dsh-picker-ui': 'slot-anchor' },
+    React.createElement(
+      'button',
+      {
       type: 'button',
       onClick,
       'data-dsh-picker-ui': 'slot-button',
@@ -119,11 +183,15 @@ function PickerButton(props) {
       // feedback, and a background swap on press was reading as a different
       // button. State still rides `aria-pressed` for assistive tech.
       style: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        transform: `translate(${offset.dx}px, ${offset.dy}px)`,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 28,
-        height: 28,
+        width: CONTROL_SIZE,
+        height: CONTROL_SIZE,
         padding: 0,
         border: 'none',
         borderRadius: 6,
@@ -132,7 +200,8 @@ function PickerButton(props) {
         cursor: 'pointer',
       },
     },
-    React.createElement(PointerIcon, null),
+      React.createElement(PointerIcon, null),
+    ),
   )
 }
 

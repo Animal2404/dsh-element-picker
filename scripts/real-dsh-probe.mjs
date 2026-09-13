@@ -382,11 +382,24 @@ if (state.pickerSlotButton === 1) {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
     if (control === null) return null
     const box = control.getBoundingClientRect()
+    const row = document.querySelector('.sbw-wrap')
+    const rowBox = row === null ? null : row.getBoundingClientRect()
     return {
       inSidebar: control.closest('[class*="sidebarCol"]') !== null,
       nearBottom: box.top > innerHeight * 0.6,
       x: Math.round(box.left),
       y: Math.round(box.top),
+      row: rowBox === null ? null : {
+        top: Math.round(rowBox.top),
+        bottom: Math.round(rowBox.bottom),
+        right: Math.round(rowBox.right),
+      },
+      onBashRow:
+        rowBox !== null &&
+        box.top + box.height / 2 > rowBox.top &&
+        box.top + box.height / 2 < rowBox.bottom,
+      inRowRight:
+        rowBox !== null && box.left > rowBox.left + rowBox.width * 0.5 && box.right <= rowBox.right + 2,
       viewport: innerWidth,
       viewportHeight: innerHeight,
     }
@@ -394,6 +407,11 @@ if (state.pickerSlotButton === 1) {
   must(
     'the control renders in the sidebar foot',
     placement !== null && placement.inSidebar === true && placement.nearBottom === true,
+    JSON.stringify(placement),
+  )
+  must(
+    'the control sits on the Bash row, at its right end',
+    placement !== null && placement.onBashRow === true && placement.inRowRight === true,
     JSON.stringify(placement),
   )
   must(
