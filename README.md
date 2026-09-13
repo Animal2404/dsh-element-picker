@@ -109,8 +109,13 @@ to serialize and block the send.
 
 Picks merge as you go, so a second pick does not add a second pill: the composer
 keeps one chip labelled `N 个元素` that carries every element's block. Hovering it
-lists what it holds — one row per element (summary, tag · role, page title), the
-list scrolling when it is long, matching ZCode's picked-element popup.
+opens a card: a header line with the element count and the page, then one row per
+element (the element summary, with its selector on a second line in monospace),
+the list scrolling when it is long, matching ZCode's picked-element popup.
+
+The card stays open while the pointer is anywhere inside it, and dropping a row
+redraws it from the chip that replaced the old one — so the row's delete button is
+reachable with a real mouse and what is left is visible without hovering again.
 
 Two deletes, matching ZCode:
 
