@@ -380,6 +380,7 @@ state = await snapshot(page)
 if (state.pickerSlotButton === 1) {
   const placement = await page.evaluate(() => {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+    const anchor = document.querySelector('[data-dsh-picker-ui="slot-anchor"]')
     if (control === null) return null
     const box = control.getBoundingClientRect()
     // Mirror the control's own rule: the first candidate that actually has a box.
@@ -414,6 +415,7 @@ if (state.pickerSlotButton === 1) {
       // Beside the row's own widget is only expected when the widget actually
       // leaves room for it; a row whose content spans its width means the
       // control is supposed to stack instead.
+      mode: anchor === null ? null : anchor.getAttribute('data-dsh-picker-mode'),
       roomForRight: (() => {
         if (row === null) return false
         const rowRect = row.getBoundingClientRect()
@@ -436,14 +438,17 @@ if (state.pickerSlotButton === 1) {
   // The Bash widget is a user plugin, so a fresh CI profile anchors to the
   // footer row itself; both are the same right-hand end of that row.
   must('the control sits on the footer row', placement !== null && placement.onRow === true, JSON.stringify(placement))
-  if (placement !== null && placement.roomForRight === true) {
+  // The control reports which placement it took: beside the row's widget when
+  // there was room, or laid out in the row when there was not. Assert the one it
+  // claims, so this checks the contract instead of a parallel guess.
+  if (placement !== null && placement.mode === 'offset') {
     must(
-      'the control sits at the right end of that row',
+      'an offset control sits at the right end of its row',
       placement.inRowRight === true,
       JSON.stringify(placement),
     )
   } else {
-    skip('right-end placement', 'this footer row has no room beside its own widget')
+    skip('right-end placement', `the control is laid out in the row (mode ${placement === null ? 'unknown' : placement.mode})`)
   }
   must(
     'the control sits on the left',
@@ -726,6 +731,7 @@ await step('a collapsed sidebar keeps the footer entries apart', async () => {
 
   const restored = await page.evaluate(() => {
     const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+    const anchor = document.querySelector('[data-dsh-picker-ui="slot-anchor"]')
     if (control === null) return null
     const box = control.getBoundingClientRect()
     const sidebar = document.querySelector('[class*="sidebarCol"]').getBoundingClientRect()

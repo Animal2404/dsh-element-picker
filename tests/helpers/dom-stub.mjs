@@ -249,6 +249,13 @@ export function createElement(tag, doc) {
       node.children.push(child)
       return child
     },
+    insertBefore(child, reference) {
+      const index = reference === null || reference === undefined ? node.children.length : node.children.indexOf(reference)
+      if (index < 0) throw new Error('insertBefore: reference is not a child')
+      child.parentElement = node
+      node.children.splice(index, 0, child)
+      return child
+    },
     removeChild(child) {
       const index = node.children.indexOf(child)
       if (index >= 0) node.children.splice(index, 1)
