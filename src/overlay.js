@@ -200,12 +200,16 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     paint()
   }
 
-  const swallow = (event) => {
-    if (!active) return
-    if (isOwnNode(event.target, doc)) return
+  const stopEvent = (event) => {
     event.preventDefault()
     event.stopPropagation()
     event.stopImmediatePropagation()
+  }
+
+  const swallow = (event) => {
+    if (!active) return
+    if (isOwnNode(event.target, doc)) return
+    stopEvent(event)
   }
 
   const onClick = (event) => {
@@ -225,7 +229,9 @@ export function createPicker({ doc, win, onPick, onEvent }) {
 
   const onKeyDown = (event) => {
     if (event.ctrlKey === true && event.shiftKey === true && event.key.toLowerCase() === TOGGLE_SHORTCUT_KEY) {
-      swallow(event)
+      // Ours in both directions: the chord must not reach the application even
+      // when it is turning selection mode on.
+      stopEvent(event)
       setActive(!active)
       emit({ type: 'toggle-shortcut' })
       return
