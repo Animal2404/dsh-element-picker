@@ -1,10 +1,14 @@
 /**
- * Selection mode: the floating pointer button, the hover highlight, the hint
- * bar, and the capture-phase event handling that turns a page click into a
- * picked element.
+ * Selection mode: the hover highlight, the hint bar, and the capture-phase
+ * event handling that turns a page click into a picked element.
+ *
+ * There is exactly ONE picker control — the entry registered in the composer
+ * tool row (`conversation.input.left`) — and it drives `toggle()` here. The
+ * overlay deliberately owns no button of its own: an earlier floating button
+ * duplicated the control and sat over the composer.
  *
  * Flow (matching ZCode's behaviour):
- *   click the floating button -> selection mode on, hovering outlines the
+ *   click the tool-row button -> selection mode on, hovering outlines the
  *   resolved element -> click an element -> the pick is reported and selection
  *   mode exits -> click the button again (or press Escape) to leave without
  *   picking.
@@ -21,7 +25,7 @@ import { resolveTarget } from './selector.js'
 export const PICKER_MARKER = 'data-dsh-picker-ui'
 
 /** Hint text shown while selection mode is on. */
-export const HINT_TEXT = '选择模式：点击界面元素插入定位信息 · 再点按钮或 Esc 取消'
+export const HINT_TEXT = '选择模式：点击界面元素插入定位信息 · 再点工具行按钮或 Esc 取消'
 
 /** Event types swallowed in the capture phase while selection mode is on. */
 const SWALLOWED_EVENTS = [
@@ -34,44 +38,14 @@ const SWALLOWED_EVENTS = [
 ]
 
 /**
+ * @param {Node | null} node - Candidate node.
  * @param {Document} doc - Owning document.
- * @returns {boolean} Whether the marker attribute names one of our nodes.
+ * @returns {boolean} Whether the node belongs to the picker's own UI.
  */
 function isOwnNode(node, doc) {
   if (node === null || node.nodeType !== 1) return false
   if (typeof node.closest !== 'function') return false
   return node.closest(`[${PICKER_MARKER}]`) !== null
-}
-
-/**
- * The mouse-pointer glyph, built without JSX so the bundle stays a classic
- * script.
- *
- * @param {Document} doc - Owning document.
- * @returns {Element} An inline SVG icon.
- */
-function createIcon(doc) {
-  const ns = 'http://www.w3.org/2000/svg'
-  const svg = doc.createElementNS(ns, 'svg')
-  svg.setAttribute('width', '20')
-  svg.setAttribute('height', '20')
-  svg.setAttribute('viewBox', '0 0 24 24')
-  svg.setAttribute('fill', 'none')
-  svg.setAttribute('aria-hidden', 'true')
-
-  const path = doc.createElementNS(ns, 'path')
-  path.setAttribute('d', 'M5 3l14 8-6 1.6L10.6 19z')
-  path.setAttribute('fill', 'currentColor')
-  svg.appendChild(path)
-
-  const rays = doc.createElementNS(ns, 'path')
-  rays.setAttribute('d', 'M3 3l2.4 2.4M3 8.4h3M8.4 3v3')
-  rays.setAttribute('stroke', 'currentColor')
-  rays.setAttribute('stroke-width', '1.6')
-  rays.setAttribute('stroke-linecap', 'round')
-  svg.appendChild(rays)
-
-  return svg
 }
 
 /**
@@ -83,7 +57,7 @@ function createIcon(doc) {
  * @param {(element: Element, event: Event) => void} options.onPick - Called with
  *   the resolved element; selection mode has already been left.
  * @param {(event: { type: string, [key: string]: unknown }) => void} [options.onEvent]
- *   - Diagnostics sink (entering/leaving/undecided picks).
+ *   - Diagnostics sink (entering/leaving/missed picks).
  * @returns {{ toggle: () => boolean, setActive: (next: boolean) => boolean,
  *   isActive: () => boolean, dispose: () => void, element: Element }} The
  *   controller.
@@ -100,13 +74,6 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   // first toggle (automation and the stylesheet both key off it).
   root.setAttribute('data-dsh-picker-active', 'false')
 
-  const button = doc.createElement('button')
-  button.type = 'button'
-  button.setAttribute(PICKER_MARKER, 'button')
-  button.setAttribute('aria-label', '选择界面元素加入聊天')
-  button.title = '选择界面元素加入聊天'
-  button.appendChild(createIcon(doc))
-
   const highlight = doc.createElement('div')
   highlight.setAttribute(PICKER_MARKER, 'highlight')
 
@@ -114,73 +81,14 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   hint.setAttribute(PICKER_MARKER, 'hint')
   hint.textContent = HINT_TEXT
 
-  root.appendChild(button)
   root.appendChild(highlight)
   root.appendChild(hint)
 
   const host = doc.body ?? doc.documentElement
   host.appendChild(root)
-  place()
 
   let active = false
   let current = null
-  let layoutObserver = null
-
-  /**
-   * Re-anchor whenever the app's own layout changes.
-   *
-   * `place()` runs once on mount, but DSH renders its composer *after* plugins
-   * apply — a one-shot placement leaves the button in the corner until the user
-   * happens to resize or scroll. A coalesced mutation observer keeps it beside
-   * the composer without a polling loop.
-   *
-   * @returns {void}
-   */
-  function watchLayout() {
-    if (typeof win.MutationObserver !== 'function') return
-    let queued = false
-    const flush = () => {
-      queued = false
-      place()
-      if (active) paint()
-    }
-    layoutObserver = new win.MutationObserver(() => {
-      if (queued) return
-      queued = true
-      if (typeof win.requestAnimationFrame === 'function') win.requestAnimationFrame(flush)
-      else setTimeout(flush, 16)
-    })
-    layoutObserver.observe(host, { childList: true, subtree: true })
-  }
-
-  /**
-   * Anchor the floating button just above the composer card's right edge.
-   *
-   * A fixed corner placement collides with the composer on a layout where the
-   * card spans the viewport width, which would make the send button unclickable
-   * while the picker is idle. Anchoring to the card keeps the button beside the
-   * composer (the same neighbourhood as ZCode's control) and moving with it; if
-   * no card is present, the CSS corner placement stands.
-   *
-   * @returns {void}
-   */
-  function place() {
-    const card =
-      doc.querySelector('[data-composer-card]') ?? doc.querySelector('[data-composer-seat]')
-    if (card === null) {
-      button.style.top = 'auto'
-      button.style.bottom = '20px'
-      button.style.right = '20px'
-      return
-    }
-    const box = card.getBoundingClientRect()
-    const gap = 8
-    const viewportWidth =
-      typeof win.innerWidth === 'number' ? win.innerWidth : box.right + gap
-    button.style.bottom = 'auto'
-    button.style.top = `${Math.max(gap, Math.round(box.top - 48))}px`
-    button.style.right = `${Math.max(gap, Math.round(viewportWidth - box.right + gap))}px`
-  }
 
   /**
    * Reposition the highlight over the current target, in viewport coordinates
@@ -248,7 +156,7 @@ export function createPicker({ doc, win, onPick, onEvent }) {
       emit({ type: 'pick-missed' })
       return
     }
-    emit({ type: 'pick', selectorReady: true })
+    emit({ type: 'pick' })
     onPick(element, event)
   }
 
@@ -261,7 +169,6 @@ export function createPicker({ doc, win, onPick, onEvent }) {
   }
 
   const onScrollOrResize = () => {
-    place()
     if (active) paint()
   }
 
@@ -275,7 +182,6 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     if (next === active) return active
     active = next
     root.setAttribute('data-dsh-picker-active', active ? 'true' : 'false')
-    button.setAttribute('aria-pressed', active ? 'true' : 'false')
 
     if (!active) {
       current = null
@@ -284,14 +190,6 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     emit({ type: active ? 'enter' : 'leave' })
     return active
   }
-
-  watchLayout()
-
-  button.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setActive(!active)
-  })
 
   doc.addEventListener('pointermove', onPointerMove, true)
   doc.addEventListener('click', onClick, true)
@@ -306,9 +204,6 @@ export function createPicker({ doc, win, onPick, onEvent }) {
     setActive,
     toggle: () => setActive(!active),
     dispose: () => {
-      if (layoutObserver !== null && typeof layoutObserver.disconnect === 'function') {
-        layoutObserver.disconnect()
-      }
       doc.removeEventListener('pointermove', onPointerMove, true)
       doc.removeEventListener('click', onClick, true)
       doc.removeEventListener('keydown', onKeyDown, true)

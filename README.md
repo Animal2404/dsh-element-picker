@@ -1,9 +1,9 @@
 # DSH Element Picker
 
-A native picker for the DeepSeek Harness Web UI: click the floating pointer
-button to enter selection mode, hover to outline a UI element, click it to
-insert its locating information into the chat composer, and click the button
-again (or press Escape) to leave selection mode.
+A native picker for the DeepSeek Harness Web UI: click the pointer button in the
+composer tool row to enter selection mode, hover to outline a UI element, click
+it to insert its locating information into the chat composer, and click the
+button again (or press Escape) to leave selection mode.
 
 Built for DSH itself — the button lives inside the app, and the elements it
 picks are the app's own UI. Picking elements on arbitrary websites is a
@@ -11,11 +11,12 @@ different job (a browser extension), not this one.
 
 ## Behaviour
 
-1. A floating pointer button sits at the bottom-right of the DSH page, and the
-   same control is registered in the composer tool row
-   (`conversation.input.left`).
-2. Click either one: selection mode turns on, the hint bar appears, and hovering
-   outlines the resolved element.
+1. One control, in the composer tool row (`conversation.input.left`): a pointer
+   icon that lights up while selection mode is on. The overlay owns no button of
+   its own — an earlier floating button duplicated the control and sat on top of
+   the composer's send button.
+2. Click it: selection mode turns on, the hint bar appears, and hovering
+   outlines the element the pick would target.
 3. Click an element: its locating block is inserted into the composer at the
    caret, and selection mode exits.
 4. Click the button again, or press Escape: selection mode exits without
@@ -23,6 +24,23 @@ different job (a browser extension), not this one.
 5. Selector generation prefers the hooks DSH exposes on purpose (`data-*`
    markers) over CSS-module class names, which are build-time hashes, and still
    falls back to a unique positional path when nothing stable exists.
+
+### What gets picked
+
+The pointer usually lands on a leaf — an icon's `<path>`, a label `<span>` — so
+the ancestry is searched for the nearest thing that identifies itself:
+
+- a component hook (`data-composer-input`, `data-composer-card`, …),
+- an element with an `id`,
+- a control: `button`/`a[href]`/`input`/`select`/`textarea`/`select`/editable
+  regions, or an interactive ARIA role.
+
+Clicking an icon therefore picks the button it belongs to, and clicking inside
+the composer picks the editable itself. When the ancestry identifies nothing, the
+element under the pointer IS the answer — deliberately, because climbing past
+that is what makes a click inside a panel select the whole panel. (DSH marks
+whole panels with `data-phase`, so treating a marker like that as a target put a
+session's entire root in the highlight.)
 
 ## Inserted block
 
@@ -146,7 +164,7 @@ src/selector.js       CSS selector, XPath, hook resolution, summary
 src/hooks-map.js      stable DOM hook -> DSH source file
 src/describe.js       the inserted block
 src/insert.js         the paste/dom/setDraft cascade
-src/overlay.js        selection mode: button, highlight, hint, events
+src/overlay.js        selection mode: highlight, hint, event handling (no button)
 src/plugin.js         entry: applies styles, mounts the overlay, registers the slot
 scripts/              cloud-side lint, build, verify
 tests/                node:test suites over a dependency-free DOM stub

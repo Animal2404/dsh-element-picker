@@ -128,7 +128,6 @@ function snapshot(page) {
       disabled: element.hasAttribute('disabled'),
     })
     const composer = document.querySelector('[data-composer-input]')
-    const button = document.querySelector('[data-dsh-picker-ui="button"]')
     return {
       title: document.title,
       composer: composer === null ? null : {
@@ -140,12 +139,8 @@ function snapshot(page) {
       composerEditable: composer !== null && composer.getAttribute('contenteditable') === 'true',
       textareas: document.querySelectorAll('textarea').length,
       hasCard: document.querySelector('[data-composer-card]') !== null,
-      pickerButton: document.querySelectorAll('[data-dsh-picker-ui="button"]').length,
+      pickerOwnButtons: document.querySelectorAll('[data-dsh-picker-ui="button"]').length,
       pickerSlotButton: document.querySelectorAll('[data-dsh-picker-ui="slot-button"]').length,
-      pickerButtonBox: button === null ? null : (() => {
-        const box = button.getBoundingClientRect()
-        return { left: Math.round(box.left), top: Math.round(box.top), width: Math.round(box.width) }
-      })(),
       buttons: [...document.querySelectorAll('button, [role="button"]')].map(describe),
       sessionRows: document.querySelectorAll('[data-session-id]').length,
     }
@@ -295,7 +290,12 @@ must(
   state.composer !== null && state.composer.contenteditable !== null && state.textareas === 0,
   JSON.stringify(state.composer),
 )
-must('the plugin mounted its floating button inside real DSH', state.pickerButton === 1, `found ${state.pickerButton}`)
+must('the plugin mounted its overlay inside real DSH', state.pickerRoot === true)
+must(
+  'the overlay owns no button of its own',
+  state.pickerOwnButtons === 0,
+  `found ${state.pickerOwnButtons} overlay button(s)`,
+)
 
 // Dismiss whatever first-run gates stand between us and a usable UI.
 for (let round = 0; round < 6; round += 1) {
@@ -388,7 +388,7 @@ await step('picking an element in the real UI', async () => {
     await page.screenshot({ path: join(out, '06-draft-typed.png') })
   }
 
-  await page.click('[data-dsh-picker-ui="button"]')
+  await page.click('[data-dsh-picker-ui="slot-button"]')
   await page.waitForTimeout(300)
   const active = await page.evaluate(
     () => document.querySelector('[data-dsh-picker-ui="root"]').getAttribute('data-dsh-picker-active'),

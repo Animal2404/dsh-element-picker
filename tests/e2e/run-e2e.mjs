@@ -83,31 +83,6 @@ async function startServer() {
 }
 
 /**
- * Whether two elements' boxes intersect — the check that catches the overlay
- * covering app controls (a floating button parked on top of Send, say).
- *
- * @param {import('playwright').Page} page - Page under test.
- * @param {string} selectorA - First element.
- * @param {string} selectorB - Second element.
- * @returns {Promise<boolean>} True when the boxes overlap by area.
- */
-function overlaps(page, selectorA, selectorB) {
-  return page.evaluate(
-    ([a, b]) => {
-      const first = document.querySelector(a)
-      const second = document.querySelector(b)
-      if (first === null || second === null) return false
-      const one = first.getBoundingClientRect()
-      const two = second.getBoundingClientRect()
-      const width = Math.min(one.right, two.right) - Math.max(one.left, two.left)
-      const height = Math.min(one.bottom, two.bottom) - Math.max(one.top, two.top)
-      return width > 0 && height > 0
-    },
-    [selectorA, selectorB],
-  )
-}
-
-/**
  * Read the overlay state out of the page.
  *
  * @param {import('playwright').Page} page - Page under test.
@@ -117,11 +92,14 @@ function overlayState(page) {
   return page.evaluate(() => {
     const root = document.querySelector('[data-dsh-picker-ui="root"]')
     const highlight = document.querySelector('[data-dsh-picker-ui="highlight"]')
-    const button = document.querySelector('[data-dsh-picker-ui="button"]')
     return {
       present: root !== null,
       active: root === null ? null : root.getAttribute('data-dsh-picker-active'),
-      pressed: button === null ? null : button.getAttribute('aria-pressed'),
+      ownButtons: document.querySelectorAll('[data-dsh-picker-ui="button"]').length,
+      slotPressed: (() => {
+        const slot = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+        return slot === null ? null : slot.getAttribute('aria-pressed')
+      })(),
       highlightVisible: highlight !== null && highlight.getAttribute('data-dsh-picker-visible') === 'true',
       highlightOutline: highlight === null ? null : getComputedStyle(highlight).outlineColor,
       highlight: highlight === null ? null : {
@@ -179,39 +157,37 @@ async function runScenario(browser, mode, origin) {
 
   console.log(`\n[${mode}]`)
   await page.goto(`${origin}/?mode=${mode}`)
-  await page.waitForSelector('[data-dsh-picker-ui="button"]')
+  await page.waitForSelector('[data-dsh-picker-ui="root"]')
 
   const boot = await overlayState(page)
   const harness = await harnessState(page)
   check('the bundle registers into conversation.input.left', harness.injected === 'conversation.input.left', String(harness.injected))
   check('the entry id is element-picker', harness.mounted?.id === 'element-picker', JSON.stringify(harness.mounted))
   check('the registered component renders into the tool row', boot.slotButtons === 1, `slot buttons: ${boot.slotButtons}`)
-  check('the floating button is mounted', boot.present === true)
+  check('the overlay is mounted', boot.present === true)
   check('selection mode starts off', boot.active === 'false', String(boot.active))
   check('the harness runs the real React build', harness.reactVersion !== undefined, String(harness.reactVersion))
   check(
-    'the floating button does not cover the composer card',
-    (await overlaps(page, '[data-dsh-picker-ui="button"]', '[data-composer-card]')) === false,
+    'the overlay owns no button of its own',
+    boot.ownButtons === 0,
+    `found ${boot.ownButtons} overlay button(s)`,
   )
-  check(
-    'the floating button does not cover the send button',
-    (await overlaps(page, '[data-dsh-picker-ui="button"]', 'button[aria-label="发送消息"]')) === false,
-  )
+  check('exactly one picker control exists', boot.slotButtons === 1, `found ${boot.slotButtons}`)
   await shot('01-boot')
 
-  // The composer-row control toggles the same state as the floating button.
+  // The single control toggles the state, twice in a row.
   await page.click('[data-dsh-picker-ui="slot-button"]')
   const viaSlot = await overlayState(page)
-  check('the composer-row control enters selection mode', viaSlot.active === 'true', String(viaSlot.active))
+  check('the tool-row control toggles on', viaSlot.active === 'true', String(viaSlot.active))
   await page.click('[data-dsh-picker-ui="slot-button"]')
   const viaSlotOff = await overlayState(page)
-  check('the composer-row control leaves selection mode', viaSlotOff.active === 'false', String(viaSlotOff.active))
+  check('the tool-row control toggles off', viaSlotOff.active === 'false', String(viaSlotOff.active))
 
-  // Floating button on: hint appears.
-  await page.click('[data-dsh-picker-ui="button"]')
+  // Enter selection mode from the single control: hint appears.
+  await page.click('[data-dsh-picker-ui="slot-button"]')
   const active = await overlayState(page)
-  check('the floating button enters selection mode', active.active === 'true', String(active.active))
-  check('the floating button shows its active state', active.pressed === 'true', String(active.pressed))
+  check('the tool-row control enters selection mode', active.active === 'true', String(active.active))
+  check('the tool-row control shows its active state', active.slotPressed === 'true', String(active.slotPressed))
   check('the hint bar is visible in selection mode', active.hintVisible === true)
   await shot('02-selection-mode')
 
@@ -278,7 +254,7 @@ async function runScenario(browser, mode, origin) {
 
   // Escape cancels without inserting.
   const draftBeforeEscape = (await overlayState(page)).draft
-  await page.click('[data-dsh-picker-ui="button"]')
+  await page.click('[data-dsh-picker-ui="slot-button"]')
   await page.keyboard.press('Escape')
   await page.waitForTimeout(100)
   const escaped = await overlayState(page)

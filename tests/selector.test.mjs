@@ -100,10 +100,26 @@ test('XPath is absolute and counts same-tag siblings', () => {
   assert.equal(generateXPath(plain), '/html/body/span')
 })
 
-test('hooks are recognised on the element itself', () => {
-  const { card, plain } = fixture()
-  assert.equal(hasStableHook(card), true)
-  assert.equal(hasStableHook(plain), false)
+test('targets are hooks, ids, and controls — not every marked container', () => {
+  const { doc, card, input, send, plain } = fixture()
+  assert.equal(hasStableHook(card), true, 'a composer hook is a target')
+  assert.equal(hasStableHook(input), true)
+  assert.equal(hasStableHook(send), true, 'a button is a target')
+  assert.equal(hasStableHook(plain), false, 'a bare span is not')
+
+  // DSH marks whole panels with data-phase (a session root carries
+  // data-phase="active"). Treating that as a target is what made a click inside
+  // a panel select the entire panel.
+  const panel = doc.createElement('div')
+  panel.setAttribute('data-phase', 'active')
+  const title = doc.createElement('span')
+  title.textContent = 'session title'
+  panel.appendChild(title)
+  doc.body.appendChild(panel)
+
+  assert.equal(hasStableHook(panel), false, 'data-phase is not a target hook')
+  assert.equal(resolveTarget(title, doc), title, 'the pointed-at element wins')
+  assert.equal(resolveTarget(panel, doc), panel)
 })
 
 test('a pick resolves upward to the nearest hooked element', () => {
@@ -115,6 +131,30 @@ test('a pick resolves upward to the nearest hooked element', () => {
   assert.equal(resolveTarget(inner, doc), input, 'the closest hooked node wins')
   assert.equal(resolveTarget(input, doc), input)
   assert.equal(resolveTarget(card, doc), card)
+})
+
+test('an icon inside a control resolves to the control', () => {
+  const { doc, send } = fixture()
+  const svg = doc.createElement('svg')
+  const path = doc.createElement('path')
+  svg.appendChild(path)
+  send.appendChild(svg)
+
+  assert.equal(resolveTarget(path, doc), send, 'the path climbs to the button')
+  assert.equal(resolveTarget(svg, doc), send)
+})
+
+test('an element with an interactive role is its own target', () => {
+  const doc = createDocument()
+  const row = doc.createElement('div')
+  row.setAttribute('role', 'button')
+  const label = doc.createElement('span')
+  label.textContent = 'open'
+  row.appendChild(label)
+  doc.body.appendChild(row)
+
+  assert.equal(hasStableHook(row), true, 'role=button is a control')
+  assert.equal(resolveTarget(label, doc), row, 'the label climbs to the control')
 })
 
 test('an element with no hook above it is returned unchanged', () => {

@@ -15,9 +15,10 @@
 /**
  * Attributes whose values are stable enough to build a readable selector from.
  *
- * Lead with DSH's own presence-flag markers: they are the hooks the Web UI
- * exposes on purpose (`data-composer-card`, `data-input-scroll`, ...), so a
- * selector anchored on one survives class-name rebuilds.
+ * Used only when generating a selector for an element that has already been
+ * chosen. `data-phase` is deliberately absent: DSH puts it on whole panels
+ * (a session root, the composer) with values that change at runtime, so it is
+ * neither a unique nor a stable selector anchor.
  */
 const STABLE_ATTRIBUTES = [
   'data-composer-card',
@@ -39,17 +40,56 @@ const STABLE_ATTRIBUTES = [
 const ID_SAFE = /^[A-Za-z_][\w-]*$/
 
 /**
- * Attributes whose presence marks an element as "interesting" during a pick,
- * used to resolve the element the user means rather than the exact node under
- * the pointer.
+ * Hooks that identify a component the picker is willing to target.
+ *
+ * This list is deliberately narrow, and separate from the selector attributes
+ * above. Resolving "what did the user point at?" by climbing to any element
+ * carrying a generic marker is what made a click inside a session header select
+ * the entire session panel: the panel root carries `data-phase="active"`. Only
+ * markers that name a component count here.
  */
-const HOOK_ATTRIBUTES = [
-  ...STABLE_ATTRIBUTES,
-  'id',
-  'data-phase',
+const TARGET_HOOKS = [
+  'data-composer-card',
+  'data-input-scroll',
+  'data-composer-input',
+  'data-composer-seat',
+  'data-composer-placeholder',
+  'data-shell-overlay',
   'data-composer-chip',
   'data-composer-text-ref',
 ]
+
+/** Tags that are controls on their own. */
+const INTERACTIVE_TAGS = new Set([
+  'BUTTON',
+  'A',
+  'INPUT',
+  'SELECT',
+  'TEXTAREA',
+  'SUMMARY',
+  'OPTION',
+])
+
+/** ARIA roles that make an element a control regardless of its tag. */
+const INTERACTIVE_ROLES = new Set([
+  'button',
+  'link',
+  'tab',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'checkbox',
+  'radio',
+  'switch',
+  'textbox',
+  'searchbox',
+  'combobox',
+  'slider',
+  'spinbutton',
+  'treeitem',
+  'gridcell',
+])
 
 /**
  * @param {string} value - Raw attribute value.
@@ -211,21 +251,48 @@ export function generateXPath(element) {
 }
 
 /**
- * Whether the element carries a hook the picker treats as meaningful.
+ * Whether the element is a control the user would recognise as "this thing".
  *
  * @param {Element} element - Candidate element.
- * @returns {boolean} True when the element has a stable hook or an id.
+ * @returns {boolean} True for buttons, links with a target, form controls,
+ *   editable regions, and elements whose role makes them interactive.
  */
-export function hasStableHook(element) {
+export function isInteractive(element) {
   if (element === null || element.nodeType !== 1) return false
-  const id = element.getAttribute('id')
-  if (id !== null && ID_SAFE.test(id)) return true
-  return HOOK_ATTRIBUTES.some((attr) => element.getAttribute(attr) !== null)
+  const tag = element.tagName
+  if (INTERACTIVE_TAGS.has(tag)) {
+    // An anchor without an href is a styling hook, not a control.
+    if (tag === 'A' && element.getAttribute('href') === null) return false
+    return true
+  }
+  if (element.getAttribute('contenteditable') === 'true') return true
+  const role = element.getAttribute('role')
+  return role !== null && INTERACTIVE_ROLES.has(role.toLowerCase())
 }
 
 /**
- * Resolve the element the user means: the pointer-most element that carries a
- * stable hook, else the original node.
+ * Whether the element identifies itself well enough to be the pick target.
+ *
+ * @param {Element} element - Candidate element.
+ * @returns {boolean} True for component hooks, ids, and controls.
+ */
+export function hasStableHook(element) {
+  if (element === null || element.nodeType !== 1) return false
+  if (TARGET_HOOKS.some((attr) => element.getAttribute(attr) !== null)) return true
+  const id = element.getAttribute('id')
+  if (id !== null && ID_SAFE.test(id)) return true
+  return isInteractive(element)
+}
+
+/**
+ * Resolve the element the user means.
+ *
+ * The pointer usually lands on a leaf (an icon's `<path>`, a label `<span>`),
+ * so the ancestry is searched for the nearest component hook, id, or control —
+ * that is what turns "the arrow glyph" into "the send button". When nothing in
+ * the ancestry identifies anything, the element under the pointer IS the
+ * answer: climbing further is what made a click inside a panel select the whole
+ * panel.
  *
  * @param {Element} element - Element under the pointer.
  * @param {Document} doc - Owning document.
@@ -235,9 +302,8 @@ export function resolveTarget(element, doc) {
   if (element === null || element.nodeType !== 1) return element
   const root = doc.documentElement
   if (element === root || element === doc.body) return element
-  if (hasStableHook(element)) return element
 
-  let node = element.parentElement
+  let node = element
   while (node !== null && node !== root && node !== doc.body) {
     if (hasStableHook(node)) return node
     node = node.parentElement

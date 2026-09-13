@@ -1,6 +1,10 @@
 /**
- * Selection mode: the floating button, the hover highlight, click-to-pick,
- * event swallowing, cancellation, and teardown.
+ * Selection mode: the hover highlight, click-to-pick, event swallowing,
+ * cancellation, and teardown.
+ *
+ * The picker deliberately owns no button: its single control lives in the
+ * composer tool row and just calls `toggle()`, so the controller is driven
+ * directly here and the suite asserts there is nothing clickable in the overlay.
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -11,8 +15,7 @@ import { PICKER_MARKER, createPicker } from '../src/overlay.js'
 /**
  * Build a document with a hooked target element.
  *
- * @returns {{ doc: object, win: object, target: object, rects: WeakMap<object, object> }}
- *   Fixture pieces; `rects` overrides getBoundingClientRect per element.
+ * @returns {{ doc: object, win: object, target: object }} Fixture pieces.
  */
 function fixture() {
   const doc = createDocument()
@@ -22,13 +25,10 @@ function fixture() {
   target.textContent = '发送'
   doc.body.appendChild(target)
 
-  const rects = new WeakMap()
-  rects.set(target, { left: 100, top: 200, width: 44, height: 30 })
-  target.getBoundingClientRect = () => rects.get(target)
-
+  target.getBoundingClientRect = () => ({ left: 100, top: 200, width: 44, height: 30 })
   doc.elementsFromPoint = () => [target]
 
-  return { doc, win, target, rects }
+  return { doc, win, target }
 }
 
 /**
@@ -52,31 +52,28 @@ function node(doc, marker) {
   return doc.querySelectorAll(`[${PICKER_MARKER}="${marker}"]`)[0] ?? null
 }
 
-test('the overlay mounts a floating button, a highlight, and a hint', () => {
+test('the overlay mounts a highlight and a hint, and nothing clickable', () => {
   const { doc, win } = fixture()
   const picker = createPicker({ doc, win, onPick: () => {} })
 
   assert.equal(node(doc, 'root') !== null, true)
-  assert.equal(node(doc, 'button').getAttribute('aria-label'), '选择界面元素加入聊天')
-  assert.equal(node(doc, 'button').title, '选择界面元素加入聊天')
   assert.equal(node(doc, 'highlight') !== null, true)
   assert.match(node(doc, 'hint').textContent, /选择模式/)
-  assert.equal(picker.isActive(), false)
-})
-
-test('the floating button toggles selection mode both ways', () => {
-  const { doc, win } = fixture()
-  const picker = createPicker({ doc, win, onPick: () => {} })
-  const button = node(doc, 'button')
-
-  button.dispatchEvent(createEvent('click'))
-  assert.equal(picker.isActive(), true)
-  assert.equal(node(doc, 'root').getAttribute('data-dsh-picker-active'), 'true')
-  assert.equal(button.getAttribute('aria-pressed'), 'true')
-
-  button.dispatchEvent(createEvent('click'))
+  assert.equal(node(doc, 'button'), null, 'the overlay must not own a button of its own')
   assert.equal(picker.isActive(), false)
   assert.equal(node(doc, 'root').getAttribute('data-dsh-picker-active'), 'false')
+})
+
+test('selection mode toggles both ways', () => {
+  const { doc, win } = fixture()
+  const picker = createPicker({ doc, win, onPick: () => {} })
+
+  assert.equal(picker.toggle(), true)
+  assert.equal(node(doc, 'root').getAttribute('data-dsh-picker-active'), 'true')
+  assert.equal(picker.toggle(), false)
+  assert.equal(node(doc, 'root').getAttribute('data-dsh-picker-active'), 'false')
+  assert.equal(picker.setActive(true), true)
+  assert.equal(picker.isActive(), true)
 })
 
 test('hovering highlights the resolved element in viewport coordinates', () => {
@@ -158,62 +155,18 @@ test('Escape leaves selection mode without picking', () => {
   assert.equal(other.prevented, false, 'other keys are untouched')
 })
 
-test('the floating button anchors above the composer card instead of the corner', () => {
-  const doc = createDocument()
-  const win = createWindow(doc)
-  win.innerWidth = 1280
-  const card = doc.createElement('div')
-  card.setAttribute('data-composer-card', '')
-  card.getBoundingClientRect = () => ({ left: 700, top: 600, width: 300, height: 120, right: 1000, bottom: 720 })
-  doc.body.appendChild(card)
-
-  createPicker({ doc, win, onPick: () => {} })
-
-  const button = node(doc, 'button')
-  assert.equal(button.style.bottom, 'auto', 'the corner offset must be released')
-  assert.equal(button.style.top, '552px', 'sits 48px above the card')
-  assert.equal(button.style.right, '288px', 'right-aligned to the card with an 8px gap')
-})
-
-test('without a composer card the corner placement stands', () => {
-  const doc = createDocument()
-  const win = createWindow(doc)
+test('moving onto empty space clears the highlight', () => {
+  const { doc, win, target } = fixture()
+  doc.elementsFromPoint = (x) => (x < 0 ? [] : [target])
   const picker = createPicker({ doc, win, onPick: () => {} })
+  picker.setActive(true)
 
-  const button = node(doc, 'button')
-  assert.equal(button.style.top, 'auto')
-  assert.equal(button.style.bottom, '20px')
-  assert.equal(button.style.right, '20px')
-  assert.equal(picker.isActive(), false)
-})
+  fire(doc, 'pointermove', createEvent('pointermove', { clientX: 5, clientY: 5 }))
+  assert.equal(node(doc, 'highlight').getAttribute('data-dsh-picker-visible'), 'true')
 
-test('a composer that mounts after the plugin re-anchors the button', () => {
-  const doc = createDocument()
-  const win = createWindow(doc)
-  win.innerWidth = 1280
-  createPicker({ doc, win, onPick: () => {} })
-  const button = node(doc, 'button')
-  assert.equal(button.style.bottom, '20px', 'starts in the corner')
-
-  // DSH renders its composer after plugins apply, so the layout is watched.
-  const card = doc.createElement('div')
-  card.setAttribute('data-composer-card', '')
-  card.getBoundingClientRect = () => ({ left: 700, top: 600, width: 300, height: 120, right: 1000, bottom: 720 })
-  doc.body.appendChild(card)
-
-  assert.equal(win.observers.length, 1, 'the layout must be observed')
-  win.observers[0].trigger()
-
-  assert.equal(button.style.bottom, 'auto')
-  assert.equal(button.style.top, '552px')
-  assert.equal(button.style.right, '288px')
-})
-
-test('dispose stops observing the layout', () => {
-  const { doc, win } = fixture()
-  const picker = createPicker({ doc, win, onPick: () => {} })
-  picker.dispose()
-  assert.equal(win.observers[0].disconnected, true)
+  // Off-screen space hit-tests to nothing at all: no element to outline.
+  fire(doc, 'pointermove', createEvent('pointermove', { clientX: -50, clientY: 5 }))
+  assert.equal(node(doc, 'highlight').getAttribute('data-dsh-picker-visible'), null)
 })
 
 test('dispose removes the overlay and stops listening', () => {

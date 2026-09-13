@@ -4,6 +4,10 @@
  * Namespaced under the picker's own root and its `data-dsh-picker-ui` markers,
  * so nothing here can collide with DSH's CSS-module classes. No `!important`:
  * the overlay is its own stacking layer, not a fight with the app's styles.
+ *
+ * The picker owns no button of its own — its one control is the entry in the
+ * composer tool row — so this layer is purely the highlight and the hint, and it
+ * never intercepts pointer events.
  */
 export const PICKER_CSS = `
 #dsh-element-picker-root {
@@ -13,38 +17,6 @@ export const PICKER_CSS = `
   height: 0;
   z-index: 2147483000;
   pointer-events: none;
-}
-
-/* Default corner placement; the controller re-anchors this beside the composer
-   card (see overlay.js) so it never sits on top of the send button. */
-[data-dsh-picker-ui="button"] {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(22, 24, 29, 0.92);
-  color: #f9fafb;
-  cursor: pointer;
-  pointer-events: auto;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-[data-dsh-picker-ui="button"]:hover {
-  background: rgba(38, 41, 48, 0.96);
-}
-
-[data-dsh-picker-active="true"] [data-dsh-picker-ui="button"] {
-  border-color: #4d6bfe;
-  background: #4d6bfe;
-  color: #ffffff;
 }
 
 [data-dsh-picker-ui="highlight"] {
