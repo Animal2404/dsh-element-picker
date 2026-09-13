@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const out = join(root, '.e2e-out')
+const out = join(root, 'e2e-out')
 
 const ROUTES = {
   '/': 'tests/e2e/harness/index.html',

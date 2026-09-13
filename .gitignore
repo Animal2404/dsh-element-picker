@@ -5,5 +5,5 @@
 #
 # So lib/ is deliberately NOT ignored; only transient output is.
 node_modules/
-.e2e-out/
+e2e-out/
 *.log
