@@ -487,7 +487,9 @@ test('a payload is rebuilt with its elements renumbered and its label updated', 
 
 test('dropping a preview row removes that element and keeps the rest grouped', () => {
   const { doc, chips } = fixture(1)
-  const before = buildGroupPayload([BLOCK, '[元素] b', '[元素] c'])
+  // Distinct names on purpose: '[元素] b' is a prefix of '[元素] button …', so a
+  // naive substring check would pass/fail for the wrong reason.
+  const before = buildGroupPayload([BLOCK, '[元素] beta', '[元素] gamma'])
   let chipsState = [{ source: CHIP_SOURCE, offset: 0, length: 12, clipboardText: before }]
   const calls = { consumed: 0, inserted: [] }
   const facade = {
@@ -515,8 +517,8 @@ test('dropping a preview row removes that element and keeps the rest grouped', (
   const payload = calls.inserted[0].ref
   assert.equal(calls.inserted[0].label, '2 个元素')
   assert.equal(payload.includes('[选择器] button.x'), true, 'the first element survives')
-  assert.equal(payload.includes('（2）[元素] c'), true, 'elements are renumbered from one')
-  assert.equal(payload.includes('[元素] b'), false, 'the dropped element is gone')
+  assert.equal(payload.includes('（2）[元素] gamma'), true, 'elements are renumbered from one')
+  assert.equal(payload.includes('[元素] beta'), false, 'the dropped element is gone')
 })
 
 test('dropping the last preview row just removes the chip', () => {
