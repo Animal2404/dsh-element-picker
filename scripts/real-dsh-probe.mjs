@@ -607,6 +607,72 @@ if (picked !== null && picked.chipSource !== null) {
 }
 
 
+// ------------------------------------------- collapsed sidebar must not overlap
+// The footer row holds DSH's own widget plus any plugin entries. In a collapsed
+// sidebar there is no horizontal room, so entries have to stack; offsetting them
+// sideways regardless is what made the control sit on top of that widget.
+await step('a collapsed sidebar keeps the footer entries apart', async () => {
+  const toggled = await page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((candidate) =>
+      /collapse sidebar/i.test(candidate.getAttribute('aria-label') ?? ''),
+    )
+    if (button === undefined) return false
+    button.click()
+    return true
+  })
+  if (!toggled) {
+    skip('collapsed footer layout', 'no collapse control in this build')
+    return
+  }
+  await page.waitForTimeout(900)
+
+  const layout = await page.evaluate(() => {
+    const box = (element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+      }
+    }
+    const control = document.querySelector('[data-dsh-picker-ui="slot-button"]')
+    if (control === null) return null
+    const controlBox = box(control)
+    const host = document.querySelector('[data-slot="sidebar.footer.action"]')
+    const others = [...(host?.children ?? [])]
+      .filter((child) => child !== control && child.getBoundingClientRect().height > 0)
+      .map(box)
+      .concat(
+        [...document.querySelectorAll('.sbw-wrap, [class*="dshoq-wrap"]')]
+          .filter((element) => element.getBoundingClientRect().height > 0)
+          .map(box),
+      )
+    const overlapping = others.filter(
+      (other) =>
+        !(other.bottom <= controlBox.top || other.top >= controlBox.bottom) &&
+        !(other.right <= controlBox.left || other.left >= controlBox.right),
+    )
+    return { control: controlBox, siblings: others.length, overlapping: overlapping.length, sample: others.slice(0, 3) }
+  })
+  must(
+    'the control does not overlap other footer entries when collapsed',
+    layout !== null && layout.overlapping === 0,
+    JSON.stringify(layout),
+  )
+  say(`collapsed footer: ${JSON.stringify(layout)}`)
+  await page.screenshot({ path: join(out, '10-collapsed-sidebar.png') })
+
+  // Put the sidebar back for the remaining steps.
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((candidate) =>
+      /expand sidebar/i.test(candidate.getAttribute('aria-label') ?? ''),
+    )
+    if (button !== undefined) button.click()
+  })
+  await page.waitForTimeout(700)
+})
+
 // ------------------------------------------------- picking inside a menu
 // Menus are the case the picker used to lose: they dismiss on WINDOW-capture
 // pointerdown, and entering selection mode by click closes them anyway. The

@@ -153,17 +153,29 @@ function PickerButton(props) {
       const here = anchor.getBoundingClientRect()
       const size = CONTROL_SIZE
 
-      // Sit immediately after whatever the row already holds (DSH's footer rows
-      // hold one full-width widget), falling back to the row's right edge.
-      let left = row.right - 6 - size
+      // The row already holds DSH's own footer widget (full width when expanded,
+      // a rail when collapsed). Sit after it only when that leaves room; in a
+      // collapsed sidebar there is none, and offsetting anyway is what made the
+      // control overlap that widget. No room means no offset: the wrapping flex
+      // row then stacks the entries, which is the top/middle/bottom the narrow
+      // sidebar should have.
+      let neighbour = null
       for (const child of target.children) {
         const childBox = child.getBoundingClientRect()
         if (childBox.width === 0 || childBox.height === 0) continue
-        left = Math.min(left, childBox.right + 8)
+        neighbour = childBox
+        break
+      }
+
+      const desired = neighbour === null ? row.right - 6 - size : neighbour.right + 8
+      const fits = desired >= row.left && desired + size <= row.right - 6
+      if (!fits) {
+        setOffset({ dx: 0, dy: 0 })
+        return
       }
 
       setOffset({
-        dx: Math.round(left - here.left),
+        dx: Math.round(desired - here.left),
         dy: Math.round(row.top + (row.height - size) / 2 - here.top),
       })
     }
