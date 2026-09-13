@@ -517,6 +517,11 @@ async function runScenario(browser, mode, origin) {
       afterRemove.chips.length === 0,
       JSON.stringify(afterRemove.chips),
     )
+    check(
+      'the preview goes away with its chip',
+      afterRemove.previewVisible === false,
+      String(afterRemove.previewVisible),
+    )
     await shot('04c-chip-removed')
   }
 

@@ -282,6 +282,7 @@ const PICKER_STATE = {
   // A chip whose source has no registered codec would fail to serialize when the
   // message is sent, so a chip is only inserted once the codec is confirmed.
   chipReady: false,
+  chipPreview: null,
   listeners: new Set(),
   subscribe(listener) {
     PICKER_STATE.listeners.add(listener)
@@ -457,6 +458,7 @@ function groupPickedChips() {
     log('grouping skipped: the chip codec is not registered')
     return
   }
+  if (PICKER_STATE.chipPreview !== null) PICKER_STATE.chipPreview.hide()
   const result = groupElementChips({
     ctx,
     sessionId: resolveSessionId(ctx, PICKER_STATE.sessionId),
@@ -485,6 +487,7 @@ function removePickedChip(chip) {
     onEvent: (message) => log(message),
   })
   log(path === null ? 'the chip was not removed' : `removed a chip via "${path}"`)
+  if (PICKER_STATE.chipPreview !== null) PICKER_STATE.chipPreview.hide()
 }
 
 /**
@@ -554,6 +557,7 @@ function applyPicker(ctx) {
   const stopWatchingTranscript = watchTranscript({ doc, win, onEvent: (message) => log(message) })
 
   const chipPreview = watchChipPreview({ doc, win, payloadOf: (chip) => chipPayload(chip) })
+  PICKER_STATE.chipPreview = chipPreview
 
   const stopWatchingChips = watchChipRemoval({
     doc,
@@ -565,6 +569,7 @@ function applyPicker(ctx) {
   ctx.effect(() => () => {
     stopWatchingTranscript()
     chipPreview.dispose()
+    PICKER_STATE.chipPreview = null
     stopWatchingChips()
     picker.dispose()
     PICKER_STATE.picker = null
