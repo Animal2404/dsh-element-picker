@@ -250,7 +250,7 @@ function overlayState(page) {
  * @returns {Promise<object>} Harness state.
  */
 function harnessState(page) {
-  return page.evaluate(() => ({
+  return page.evaluate(async () => ({
     calls: { ...window.__harness.calls },
     mode: window.__harness.mode,
     injected: window.__harness.injected,
@@ -258,6 +258,11 @@ function harnessState(page) {
     chipCodec: window.__harness.chips === undefined || window.__harness.chips.name === null ? null : window.__harness.chips.name,
     chipPayloads: window.__harness.chips === undefined ? [] : window.__harness.chips.inserted.map((entry) => entry.clipboardText),
     chipLabels: window.__harness.chips === undefined ? [] : window.__harness.chips.inserted.map((entry) => entry.label),
+    chipModels: window.__harness.chips === undefined ? [] : window.__harness.chips.inserted.map((entry) => entry.ref),
+    serializedPrompt:
+      window.__harness.chips === undefined || window.__harness.chips.serializePrompt === undefined
+        ? ''
+        : await window.__harness.chips.serializePrompt(),
     reactVersion: window.React.version,
   }))
 }
@@ -470,6 +475,26 @@ async function runScenario(browser, mode, origin) {
         (inserted.chips[0]?.label ?? '').length < 70 &&
         inserted.draft.includes('[元素]') === false,
       JSON.stringify(inserted.chips[0]),
+    )
+    const newline = String.fromCharCode(10)
+    check(
+      'the chip keeps the draft to one compact line',
+      afterInsert.chipPayloads.length > 0 &&
+        afterInsert.chipPayloads.every((text) => text.split(newline).length === 1 && text.includes('[XPath]') === false),
+      JSON.stringify(afterInsert.chipPayloads),
+    )
+    check(
+      'the reference carries the full block for the model',
+      afterInsert.chipModels.length > 0 &&
+        afterInsert.chipModels.every((model) => typeof model === 'string' && model.includes('[XPath]')),
+      JSON.stringify((afterInsert.chipModels[0] ?? '').slice(0, 70)),
+    )
+    check(
+      'sending expands the chip to the full block, not the draft line',
+      afterInsert.serializedPrompt.includes('[XPath]') &&
+        afterInsert.serializedPrompt.includes('[元素]') &&
+        afterInsert.serializedPrompt.includes('[选择器]'),
+      afterInsert.serializedPrompt.slice(0, 90),
     )
     check(
       'the codec that expands the chip on send was registered',

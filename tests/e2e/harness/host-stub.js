@@ -159,7 +159,7 @@
         var recompute = function () {
           var text = chips.text
           chips.occurrences = chips.inserted.map(function (entry) {
-            var occurrence = { offset: text.length, length: entry.clipboardText.length, clipboardText: entry.clipboardText, source: entry.source }
+            var occurrence = { offset: text.length, length: entry.clipboardText.length, clipboardText: entry.clipboardText, ref: entry.ref, source: entry.source }
             text += entry.clipboardText + ' '
             return occurrence
           })
@@ -195,7 +195,7 @@
             return false
           },
           insertReference: function (ref, span) {
-            chips.inserted.push({ source: ref.source, clipboardText: ref.clipboardText, label: ref.label, span: span })
+            chips.inserted.push({ source: ref.source, ref: ref.ref, clipboardText: ref.clipboardText, label: ref.label, span: span })
             var chip = document.createElement('span')
             chip.setAttribute('data-composer-chip', ref.source)
             chip.setAttribute('contenteditable', 'false')
@@ -205,6 +205,22 @@
             return true
           }
         } } } }
+        // DSH's submit path (sinkSerialized): every chip's draft slice is replaced
+        // by its codec's model form before the prompt is sent.
+        chips.serializePrompt = function () {
+          var draft = chips.projection
+          if (chips.registered === undefined || chips.registered.codec === undefined) return Promise.resolve(draft)
+          return Promise.all(chips.occurrences.map(function (occurrence) {
+            return Promise.resolve(chips.registered.codec.serialize(occurrence.ref)).then(function (text) {
+              return { offset: occurrence.offset, length: occurrence.length, text: text }
+            })
+          })).then(function (parts) {
+            var out = ''
+            var cursor = 0
+            for (var i = 0; i < parts.length; i += 1) { out += draft.slice(cursor, parts[i].offset) + parts[i].text; cursor = parts[i].offset + parts[i].length }
+            return out + draft.slice(cursor)
+          })
+        }
         extra.inputTriggers = { registerSource: function (source) { chips.registered = source; chips.name = source.name; return function () {} } }
       }
 

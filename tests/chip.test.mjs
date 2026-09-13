@@ -19,6 +19,8 @@ import {
   REMOVE_ZONE_PX,
   chipIndexOf,
   chipLabel,
+  compactChipText,
+  occurrencePayload,
   chipPayloadOf,
   chipSpan,
   insertElementChip,
@@ -107,8 +109,14 @@ test('the chip source is registered with a codec that expands the block', async 
   assert.equal(source.trigger, '@')
   assert.deepEqual(await source.candidates(), [], 'the source is inert in the @ menu')
 
-  assert.equal(source.codec.clipboardText(BLOCK), BLOCK)
-  assert.equal(await source.codec.serialize(BLOCK), BLOCK, 'the model receives the block, not the label')
+  // The draft shows the compact line; the model form is the whole block.
+  const draft = source.codec.clipboardText(BLOCK)
+  assert.equal(draft.split(String.fromCharCode(10)).length, 1, draft)
+  assert.equal(draft.includes('[元素] button.primary "发送"'), true, draft)
+  assert.equal(draft.includes('[选择器]'), true, draft)
+  assert.equal(draft.includes('[XPath]'), false, draft)
+  assert.equal(draft.includes('[HTML]'), false, draft)
+  assert.equal(await source.codec.serialize(BLOCK), BLOCK, 'the model receives the block, not the draft line')
 })
 
 test('registering without a trigger registry reports failure instead of throwing', () => {
@@ -120,7 +128,7 @@ test('registering without a trigger registry reports failure instead of throwing
   )
 })
 
-test('a chip is inserted with the block as both ref and clipboard text', () => {
+test('a chip carries the block as its reference and the compact line as draft text', () => {
   const { ctx, calls } = stubs()
   const events = []
   const result = insertElementChip({
@@ -135,8 +143,9 @@ test('a chip is inserted with the block as both ref and clipboard text', () => {
   assert.equal(calls.inserted.length, 1)
   const { ref, span } = calls.inserted[0]
   assert.equal(ref.source, CHIP_SOURCE)
-  assert.equal(ref.ref, BLOCK)
-  assert.equal(ref.clipboardText, BLOCK)
+  assert.equal(ref.ref, BLOCK, 'the reference is what the codec turns into the model form')
+  assert.equal(ref.clipboardText, compactChipText(BLOCK), 'the draft stays one short line')
+  assert.equal(ref.clipboardText.split(String.fromCharCode(10)).length, 1)
   assert.equal(ref.label, '元素 button「发送」')
   assert.deepEqual(span, { start: 11, end: 11, draftRev: 7 }, 'the span is guarded by the published revision')
   assert.deepEqual(events, [])
@@ -455,6 +464,23 @@ test('a group payload parses back into one preview row per element', () => {
   assert.equal(rows[0].block.includes('[选择器] span.a'), true)
   assert.equal(rows[0].block.includes('（2）'), false, 'a block is bare, without its number')
   assert.equal(rows[1].block.includes('[选择器] div.b'), true)
+})
+
+test('the compact draft line keeps only what locates the element', () => {
+  assert.equal(compactChipText(BLOCK).startsWith('[元素] button.primary "发送"'), true)
+  assert.equal(compactChipText(BLOCK).includes('[选择器] button[aria-label="发送消息"]'), true)
+  assert.equal(compactChipText(BLOCK).includes('[源码]'), true)
+  // A group chip's header line is already the short form.
+  assert.equal(compactChipText('[元素组] 3 个界面元素' + String.fromCharCode(10) + '（1）[元素] a'), '[元素组] 3 个界面元素')
+  // Anything that is not one of our blocks is left alone.
+  assert.equal(compactChipText('普通文字'), '普通文字')
+  assert.equal(compactChipText(undefined), '')
+})
+
+test('the reference outranks the draft text when reading a chip payload', () => {
+  assert.equal(occurrencePayload({ ref: BLOCK, clipboardText: '[元素] x ｜ [选择器] y' }), BLOCK)
+  assert.equal(occurrencePayload({ clipboardText: BLOCK }), BLOCK, 'older drafts only carry the text')
+  assert.equal(occurrencePayload(undefined), '')
 })
 
 test('the payload of a chip is read back from the published occurrences', () => {
