@@ -122,17 +122,20 @@ function overlayState(page) {
       transcriptRun: (() => {
         const run = document.getElementById('sent-run')
         if (run === null) return null
-        const pill = run.querySelector('[data-dsh-picker-transcript-pill]')
+        const before = run.previousElementSibling
+        const pill =
+          before !== null && before !== undefined && before.hasAttribute('data-dsh-picker-transcript-pill')
+            ? before
+            : document.querySelector('[data-dsh-picker-transcript-pill]')
         const hidden = run.querySelector('[data-dsh-picker-folded-run]')
         return {
           text: run.textContent,
+          visibleText: (run.innerText || '').replace(/\s+/g, ' ').trim(),
           pillLabel: pill === null ? null : (pill.textContent || '').trim(),
           pillIcon: pill === null ? false : pill.querySelector('[data-dsh-picker-pill-glyph] svg') !== null,
+          pillOutside: pill !== null && run.contains(pill) === false,
           hiddenDisplay: hidden === null ? null : hidden.style.display,
           hiddenHasBlock: hidden === null ? false : /\[选择器\]/.test(hidden.textContent || ''),
-          userWordsVisible: [...run.children].some(
-            (child) => child.style.display !== 'none' && (child.textContent || '').includes('往左移一点'),
-          ),
         }
       })(),
       transcriptFoldedLines: document.querySelectorAll('[data-dsh-picker-folded]').length,
@@ -343,9 +346,11 @@ async function runScenario(browser, mode, origin) {
   )
   check(
     "a run folds only the block, and the user's own words stay",
-    boot.transcriptRun?.hiddenDisplay === 'none' &&
+    boot.transcriptRun?.pillOutside === true &&
+      boot.transcriptRun?.hiddenDisplay === 'none' &&
       boot.transcriptRun?.hiddenHasBlock === true &&
-      boot.transcriptRun?.userWordsVisible === true,
+      /往左移一点/.test(boot.transcriptRun?.visibleText ?? '') &&
+      /\[选择器\]/.test(boot.transcriptRun?.visibleText ?? '') === false,
     JSON.stringify(boot.transcriptRun),
   )
   check(

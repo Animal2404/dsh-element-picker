@@ -249,7 +249,11 @@ test('the pill label is one line: the element, not the whole block', () => {
   one.textContent = '[元素] div.uV2eYG_input' + ' ' + String.fromCharCode(65372) + ' [选择器] div[data-composer-input="true"]' + ' ' + String.fromCharCode(65372) + ' [源码] …/InputBar.tsx'
   compact.body.appendChild(one)
   assert.equal(foldTranscriptBlocks(compact), 1)
-  assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent, '❯元素 div')
+  assert.equal(
+    compact.querySelectorAll('[data-dsh-picker-pill-label]')[0].textContent,
+    '元素 div',
+    'the label is the element, without the class name or the block',
+  )
   assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent.includes('[选择器]'), false)
 })
 
