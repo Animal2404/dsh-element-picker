@@ -12,7 +12,7 @@
  * selecting, copying, and the model's own view are all unaffected.
  */
 
-import { isModelLead } from './chip.js'
+import { chipGlyph, chipLabelFromBlock, isModelLead } from './chip.js'
 
 /** Marker on the pill this module renders. Also keeps the picker off it. */
 export const PILL_MARKER = 'data-dsh-picker-transcript-pill'
@@ -25,9 +25,6 @@ const FIELD_RE = /^(?:（\d+）)?\s*\[(?:元素|选择器|XPath|位置|样式|�
 
 /** Every line a block may hold, including the header a group payload opens with. */
 const BLOCK_LINE_RE = /^(?:（\d+）)?\s*\[(?:元素组|元素|选择器|XPath|位置|样式|属性|源码|HTML)\]/
-
-/** The line that opens a block. */
-const OPENS_RE = /^(?:（\d+）)?\s*\[元素\]\s*/
 
 /** The line that opens a block, group payloads included. */
 const OPENS_ANY_RE = /^(?:（\d+）)?\s*\[(?:元素组|元素)\]\s*/
@@ -136,16 +133,10 @@ function isBlockOnly(text) {
  * @returns {string} The pill's label.
  */
 function pillLabel(text) {
-  const first = String(text ?? '')
-    .split(String.fromCharCode(10))
-    .find((line) => OPENS_RE.test(line.trim()) || /^\s*\[元素组\]/.test(line))
-  const line = (first ?? '').trim()
-  let label = line.split('｜')[0].replace(/^\[元素组\]\s*/, '').replace(OPENS_RE, '').trim()
-  // Stop at the next field: the trajectory view separates them with spaces where
-  // the inserted payload uses `｜`, and the label is the element either way.
-  const stray = label.search(TAG_ANY_RE)
-  if (stray >= 0) label = label.slice(0, stray).trim()
-  return label.length > 60 ? `${label.slice(0, 60)}…` : label
+  const body = String(text ?? '')
+  const group = /\[元素组\]\s*(\d+)\s*个界面元素/.exec(body)
+  if (group !== null) return `${group[1]} 个元素`
+  return chipLabelFromBlock(body)
 }
 
 /**
@@ -178,26 +169,7 @@ function foldBlock({ doc, first }) {
     sibling = sibling.nextElementSibling
   }
 
-  const pill = doc.createElement('span')
-  pill.setAttribute(PILL_MARKER, 'true')
-  // `data-dsh-picker-ui` keeps the picker from picking our own pill.
-  pill.setAttribute('data-dsh-picker-ui', 'transcript-pill')
-  pill.setAttribute('role', 'button')
-  pill.setAttribute('tabindex', '0')
-  pill.setAttribute('title', '点击展开/收起完整定位信息')
-  pill.setAttribute('aria-expanded', 'false')
-
-  const glyph = doc.createElement('span')
-  glyph.setAttribute('data-dsh-picker-pill-glyph', 'true')
-  glyph.textContent = '❯'
-  glyph.setAttribute('aria-hidden', 'true')
-
-  const label = doc.createElement('span')
-  label.setAttribute('data-dsh-picker-pill-label', 'true')
-  label.textContent = pillLabel(first.textContent)
-
-  pill.appendChild(glyph)
-  pill.appendChild(label)
+  const { pill } = createPill({ doc, text: first.textContent })
 
   const toggle = (event) => {
     event.preventDefault()
@@ -217,6 +189,152 @@ function foldBlock({ doc, first }) {
   const host = anchor.parentElement ?? first.parentElement
   host?.insertBefore(pill, anchor)
   for (const element of folded) element.style.display = 'none'
+  return true
+}
+
+/** A block hidden inside a text run, split out of the run's own text node. */
+const RUN_MARKER = 'data-dsh-picker-folded-run'
+const LF = String.fromCharCode(10)
+
+/**
+ * Build the pill that stands in for a block.
+ *
+ * @param {object} options - Pill request.
+ * @param {Document} options.doc - Owning document.
+ * @param {string} options.text - The block the pill stands for.
+ * @returns {{ pill: Element, label: Element }} The pill and its label node.
+ */
+function createPill({ doc, text }) {
+  const pill = doc.createElement('span')
+  pill.setAttribute(PILL_MARKER, 'true')
+  // `data-dsh-picker-ui` keeps the picker from picking our own pill.
+  pill.setAttribute('data-dsh-picker-ui', 'transcript-pill')
+  pill.setAttribute('role', 'button')
+  pill.setAttribute('tabindex', '0')
+  pill.setAttribute('title', '点击展开/收起完整定位信息')
+  pill.setAttribute('aria-expanded', 'false')
+
+  // The same window glyph the composer's chip carries, so a sent pick reads as
+  // the same badge it was before it was sent.
+  const icon = chipGlyph(doc)
+  const glyph = doc.createElement('span')
+  glyph.setAttribute('data-dsh-picker-pill-glyph', 'true')
+  glyph.setAttribute('aria-hidden', 'true')
+  if (icon === null) glyph.textContent = '❯'
+  else glyph.appendChild(icon)
+
+  const label = doc.createElement('span')
+  label.setAttribute('data-dsh-picker-pill-label', 'true')
+  label.textContent = pillLabel(text)
+
+  pill.appendChild(glyph)
+  pill.appendChild(label)
+  return { pill, label }
+}
+
+/**
+ * The character range the element block occupies inside one run of text.
+ *
+ * The block is line-shaped even when the application renders the whole message as
+ * a single text node: the lead sentence (when present) and then the field lines.
+ * Anything after them — the words the user typed themselves — stays outside the
+ * range, so folding never takes text it did not write.
+ *
+ * @param {string} text - The run's text, newlines included.
+ * @returns {{ start: number, end: number } | null} Offsets, or null when the text holds no block.
+ */
+function blockRangeIn(text) {
+  const lines = String(text ?? '').split(LF)
+  if (lines.length < 2) return null
+  let start = -1
+  let end = -1
+  let offset = 0
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (start < 0) {
+      if (isModelLead(trimmed) || OPENS_ANY_RE.test(trimmed)) {
+        start = offset
+        end = offset + line.length
+      }
+    } else if (trimmed === '' || isModelLead(trimmed) || isBlockLine(trimmed)) {
+      // A blank line inside a group payload is part of the block; anything that
+      // is not a block line ends it.
+      if (trimmed !== '') end = offset + line.length
+    } else {
+      break
+    }
+    offset += line.length + 1
+  }
+  return start < 0 ? null : { start, end }
+}
+
+/**
+ * Put one text node back into an element, without assuming text-node support.
+ *
+ * @param {object} options - Append request.
+ * @param {Document} options.doc - Owning document.
+ * @param {Element} options.host - Element to append to.
+ * @param {string} options.text - Text to append.
+ * @returns {void}
+ */
+function appendText({ doc, host, text }) {
+  if (text === '') return
+  if (typeof doc.createTextNode === 'function') {
+    host.appendChild(doc.createTextNode(text))
+    return
+  }
+  const span = doc.createElement('span')
+  span.setAttribute('data-dsh-picker-run-text', 'true')
+  span.textContent = text
+  host.appendChild(span)
+}
+
+/**
+ * Fold only the block inside a run that also carries the user's own words.
+ *
+ * The run's text is split at the block's edges — the words before and after it
+ * stay exactly where they were, as text — and the block itself moves into a
+ * wrapper this module hides. Copying the message still sees every character.
+ *
+ * @param {object} options - Fold request.
+ * @param {Document} options.doc - Owning document.
+ * @param {Element} options.element - The element holding the run.
+ * @param {{ start: number, end: number }} options.range - Where the block sits.
+ * @returns {boolean} Whether a pill was created.
+ */
+function foldRunBlock({ doc, element, range }) {
+  if (element.hasAttribute(FOLD_MARKER) || element.querySelector(`[${FOLD_MARKER}]`) !== null) return false
+  if (element.children !== undefined && element.children.length > 0) return false
+  const text = element.textContent ?? ''
+  const block = text.slice(range.start, range.end)
+  if (block.trim() === '') return false
+
+  const { pill } = createPill({ doc, text: block })
+  const wrapper = doc.createElement('span')
+  wrapper.setAttribute(FOLD_MARKER, 'true')
+  wrapper.setAttribute(RUN_MARKER, 'true')
+  wrapper.textContent = block
+  wrapper.style.display = 'none'
+
+  const before = text.slice(0, range.start)
+  const after = text.slice(range.end)
+  element.textContent = ''
+  appendText({ doc, host: element, text: before })
+  element.appendChild(pill)
+  element.appendChild(wrapper)
+  appendText({ doc, host: element, text: after })
+
+  const toggle = (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const open = pill.getAttribute('aria-expanded') === 'true'
+    pill.setAttribute('aria-expanded', open ? 'false' : 'true')
+    wrapper.style.display = open ? 'none' : ''
+  }
+  pill.addEventListener('click', toggle)
+  pill.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') toggle(event)
+  })
   return true
 }
 
@@ -250,12 +368,20 @@ export function foldTranscriptBlocks(doc) {
     if (element.querySelector(`[${FOLD_MARKER}]`) !== null) continue
     if (element.querySelector(`[${PILL_MARKER}]`) !== null) continue
     if (hasPillBefore(element)) continue
-    const text = (element.textContent ?? '').trim()
-    // An element that opens with the lead sentence and then lists the block is the
-    // same block in another rendering (one text node, e.g. a table cell).
-    if (!OPENS_ANY_RE.test(text) && !isModelLead(text.split(String.fromCharCode(10))[0])) continue
-    if (!isBlockOnly(text)) continue
-    if (foldBlock({ doc, first: element })) folded += 1
+    const raw = element.textContent ?? ''
+    const text = raw.trim()
+    if (isBlockOnly(text)) {
+      // An element that opens with the lead sentence and then lists the block is
+      // the same block in another rendering (one text node, e.g. a table cell).
+      if (!OPENS_ANY_RE.test(text) && !isModelLead(text.split(String.fromCharCode(10))[0])) continue
+      if (foldBlock({ doc, first: element })) folded += 1
+      continue
+    }
+    // A run that holds the block *and* the words the user typed around it: fold
+    // the block on its own, so their sentence stays in the conversation.
+    const range = blockRangeIn(raw)
+    if (range === null) continue
+    if (foldRunBlock({ doc, element, range })) folded += 1
   }
   return folded
 }

@@ -229,8 +229,8 @@ export const PICKER_CSS = `
   padding: 0 6px;
   border-radius: 6px;
   background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.06));
-  color: var(--dsw-alias-state-business-primary, #4d6bfe);
-  font-size: 13px;
+  color: var(--dsw-alias-state-business-primary, rgb(103, 158, 254));
+  font-size: 14px;
   line-height: 22px;
   vertical-align: bottom;
   cursor: pointer;
@@ -249,7 +249,13 @@ export const PICKER_CSS = `
 
 [data-dsh-picker-pill-glyph] {
   flex: none;
+  display: inline-flex;
+  align-items: center;
   transition: transform 120ms ease;
+}
+
+[data-dsh-picker-pill-glyph] svg {
+  display: block;
 }
 
 [data-dsh-picker-transcript-pill][aria-expanded="true"] [data-dsh-picker-pill-glyph] {

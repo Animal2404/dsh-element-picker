@@ -57,7 +57,7 @@ test('a sent block folds into one pill and hides its lines', () => {
   assert.equal(pill.length, 1)
   assert.equal(pill[0].getAttribute('aria-expanded'), 'false')
   // The label is the element summary without its marker.
-  assert.equal(pill[0].textContent.includes('span "完全权限"'), true)
+  assert.equal(pill[0].textContent.includes('元素 span「完全权限」'), true, pill[0].textContent)
   assert.equal(pill[0].textContent.includes('[元素]'), false)
 
   // Every line of the block is hidden, and the text is still there to copy.
@@ -138,7 +138,7 @@ test('the label stops at the next field when the renderer uses spaces', () => {
 
   foldTranscriptBlocks(doc)
   const label = doc.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent
-  assert.equal(label.includes('span "完全权限"'), true, label)
+  assert.equal(label.includes('元素 span「完全权限」'), true, label)
   assert.equal(label.includes('[选择器]'), false, label)
   assert.equal(label.includes('[XPath]'), false, label)
 })
@@ -180,8 +180,40 @@ test('a cell that renders the lead and the block as one text node folds once', (
   assert.equal(foldTranscriptBlocks(doc), 1)
   assert.equal(cell.getAttribute(FOLD_MARKER), 'true')
   const label = doc.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent
-  assert.equal(label.includes('span \"完全权限\"'), true, label)
+  assert.equal(label.includes('元素 span「完全权限」'), true, label)
   assert.equal(label.includes('我选取了'), false, label)
+})
+
+test("a run that also holds the user's words folds only the block", () => {
+  const doc = createDocument()
+  const newline = String.fromCharCode(10)
+  const run = doc.createElement('span')
+  run.textContent = ['我选取了 1 个界面元素，以下是定位信息：', ...BLOCK_LINES, '优化这个 UI 把白色描边去掉'].join(newline)
+  doc.body.appendChild(run)
+  const original = run.textContent
+
+  assert.equal(foldTranscriptBlocks(doc), 1)
+  const pill = doc.querySelectorAll(`[${PILL_MARKER}]`)[0]
+  const wrapper = doc.querySelectorAll('[data-dsh-picker-folded-run]')[0]
+  assert.equal(wrapper.style.display, 'none', 'the block itself is hidden')
+  assert.equal(wrapper.textContent.includes('[XPath]'), true, 'the block stays in the DOM to copy')
+  assert.equal(wrapper.textContent.includes('我选取了'), true, 'the lead hides with it')
+  assert.equal(wrapper.textContent.includes('优化这个 UI'), false, "the user's words are not inside the fold")
+
+  // Their sentence is still there, and every character of the message survived.
+  const kept = [...run.children].filter((child) => child.style.display !== 'none' && child.textContent.includes('优化这个 UI'))
+  assert.equal(kept.length, 1, 'the sentence is not hidden')
+  assert.equal(run.textContent, original, 'the text is unchanged, only split')
+
+  // The pill is the block's toggle, and it is not the user's sentence.
+  assert.equal(pill.getAttribute('aria-expanded'), 'false')
+  pill.dispatchEvent(createEvent('click'))
+  assert.equal(pill.getAttribute('aria-expanded'), 'true')
+  assert.equal(wrapper.style.display, '', 'expanding brings the block back')
+
+  // A second pass must not fold it again.
+  assert.equal(foldTranscriptBlocks(doc), 0)
+  assert.equal(doc.querySelectorAll(`[${PILL_MARKER}]`).length, 1)
 })
 
 test('a container that only starts with the block is left to its block', () => {
@@ -207,7 +239,7 @@ test('the pill label is one line: the element, not the whole block', () => {
   foldTranscriptBlocks(doc)
   const label = doc.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent
   assert.equal(label.includes(String.fromCharCode(10)), false, label)
-  assert.equal(label.includes('span "完全权限"'), true, label)
+  assert.equal(label.includes('元素 span「完全权限」'), true, label)
   assert.equal(label.includes('[选择器]'), false, label)
 
   // A compact one-line block shows the element and stops at the first field.

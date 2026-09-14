@@ -39,6 +39,60 @@ export function chipLabel(element) {
 }
 
 /**
+ * The chip's own icon: the window glyph DSH draws on a reference chip.
+ *
+ * @param {Document} doc - Owning document.
+ * @returns {Element | null} A 14x14 inline SVG, or null when the document cannot make one.
+ */
+export function chipGlyph(doc) {
+  if (typeof doc.createElementNS !== 'function') return null
+  const ns = 'http://www.w3.org/2000/svg'
+  const svg = doc.createElementNS(ns, 'svg')
+  svg.setAttribute('width', '14')
+  svg.setAttribute('height', '14')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('aria-hidden', 'true')
+  const paths = [
+    'M11.2426 4.80473V6.10551H4.75819V4.80473H11.2426Z',
+    'M9.40858 7.84478V9.14557H4.75819V7.84478H9.40858Z',
+    'M9.23438 0.546389C10.1941 0.546389 10.9683 0.544914 11.5859 0.611819C12.2161 0.680096 12.7634 0.825745 13.2393 1.17139C13.5172 1.3733 13.7619 1.61812 13.9639 1.896C14.3096 2.37183 14.4551 2.91922 14.5234 3.54932C14.5903 4.16686 14.5889 4.94133 14.5889 5.90088V10.0981C14.5889 11.0576 14.5903 11.8321 14.5234 12.4497C14.4552 13.0798 14.3094 13.6272 13.9639 14.103C13.7619 14.381 13.5172 14.6257 13.2393 14.8276C12.7633 15.1734 12.2163 15.3189 11.5859 15.3872C10.9683 15.4541 10.1942 15.4536 9.23438 15.4536H6.76563C5.80591 15.4536 5.03168 15.4541 4.41407 15.3872C3.78385 15.3189 3.23665 15.1734 2.76074 14.8276C2.48291 14.6257 2.23802 14.3809 2.03614 14.103C1.69066 13.6272 1.54483 13.0798 1.47657 12.4497C1.40973 11.8321 1.41114 11.0576 1.41114 10.0981V5.90088C1.41113 4.94132 1.40966 4.16686 1.47657 3.54932C1.54488 2.91921 1.69042 2.37184 2.03614 1.896C2.2381 1.61807 2.4828 1.37333 2.76074 1.17139C3.23665 0.825682 3.78386 0.680109 4.41407 0.611819C5.03168 0.544905 5.80591 0.546389 6.76563 0.546389H9.23438ZM6.76563 1.896C5.77586 1.896 5.0876 1.89738 4.55957 1.95459C4.0443 2.01043 3.76214 2.11349 3.55469 2.26416C3.39135 2.38284 3.24761 2.52662 3.12891 2.68994C2.97821 2.89736 2.8752 3.17967 2.81934 3.69483C2.76214 4.22279 2.76075 4.91131 2.76074 5.90088V10.0981C2.76074 11.0876 2.76221 11.7762 2.81934 12.3042C2.87516 12.8194 2.97829 13.1026 3.12891 13.3101C3.24754 13.4733 3.39147 13.6172 3.55469 13.7358C3.76213 13.8865 4.04438 13.9896 4.55957 14.0454C5.0876 14.1026 5.77586 14.103 6.76563 14.103H9.23438C10.2242 14.103 10.9124 14.1026 11.4404 14.0454C11.9556 13.9896 12.2379 13.8865 12.4453 13.7358C12.6086 13.6172 12.7525 13.4733 12.8711 13.3101C13.0217 13.1026 13.1248 12.8195 13.1807 12.3042C13.2378 11.7762 13.2393 11.0876 13.2393 10.0981V5.90088C13.2393 4.91131 13.2379 4.22279 13.1807 3.69483C13.1248 3.17969 13.0218 2.89736 12.8711 2.68994C12.7524 2.52667 12.6086 2.38281 12.4453 2.26416C12.2379 2.11355 11.9556 2.01041 11.4404 1.95459C10.9124 1.8974 10.2241 1.896 9.23438 1.896H6.76563Z',
+  ]
+  for (const d of paths) {
+    const path = doc.createElementNS(ns, 'path')
+    path.setAttribute('d', d)
+    path.setAttribute('fill', 'currentColor')
+    svg.appendChild(path)
+  }
+  return svg
+}
+
+/**
+ * A chip's label, read back from the block it stands for.
+ *
+ * The transcript shows the same words and the same icon as the chip in the
+ * composer, so a sent pick reads as one badge instead of a wall of fields.
+ *
+ * @param {string} block - One element's block.
+ * @returns {string} The label, e.g. `元素 span「工作区」`.
+ */
+export function chipLabelFromBlock(block) {
+  const line = String(block ?? '')
+    .split(LF)
+    .find((part) => OPENS_RE.test(part.trim())) ?? ''
+  const piece = line.split(COMPACT_BAR)[0].replace(OPENS_RE, '').trim()
+  const cut = piece.indexOf(' [')
+  const summary = (cut >= 0 ? piece.slice(0, cut) : piece).trim()
+  if (summary === '') return '元素'
+  const tag = summary.split(/[\s.#:]/)[0] || 'element'
+  const quoted = /"([^"]*)"/.exec(summary)
+  const text = quoted === null ? '' : quoted[1].replace(/\s+/g, ' ').trim()
+  if (text === '') return `元素 ${tag}`
+  const clipped = text.length > LABEL_LIMIT ? `${text.slice(0, LABEL_LIMIT)}…` : text
+  return `元素 ${tag}「${clipped}」`
+}
+
+/**
  * Register the source our chips belong to, so they serialize on submit.
  *
  * `source` on the chip must name a registered trigger source that carries a
@@ -131,6 +185,9 @@ const COMPACT_FIELDS = ['元素', '选择器', '源码']
 /** Separator the compact block writes between its fields. */
 const COMPACT_BAR = '｜'
 const LF = String.fromCharCode(10)
+/** The line that opens an element block. */
+const OPENS_RE = /^(?:（\d+）)?\s*\[元素\]\s*/
+
 /** Group payloads number their blocks with this prefix. */
 const GROUP_ITEM_RE = /（\d+）/
 

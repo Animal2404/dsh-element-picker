@@ -119,6 +119,22 @@ function overlayState(page) {
         height: Number.parseFloat(highlight.style.height),
       },
       transcriptPills: document.querySelectorAll('[data-dsh-picker-transcript-pill]').length,
+      transcriptRun: (() => {
+        const run = document.getElementById('sent-run')
+        if (run === null) return null
+        const pill = run.querySelector('[data-dsh-picker-transcript-pill]')
+        const hidden = run.querySelector('[data-dsh-picker-folded-run]')
+        return {
+          text: run.textContent,
+          pillLabel: pill === null ? null : (pill.textContent || '').trim(),
+          pillIcon: pill === null ? false : pill.querySelector('[data-dsh-picker-pill-glyph] svg') !== null,
+          hiddenDisplay: hidden === null ? null : hidden.style.display,
+          hiddenHasBlock: hidden === null ? false : /\[选择器\]/.test(hidden.textContent || ''),
+          userWordsVisible: [...run.children].some(
+            (child) => child.style.display !== 'none' && (child.textContent || '').includes('往左移一点'),
+          ),
+        }
+      })(),
       transcriptFoldedLines: document.querySelectorAll('[data-dsh-picker-folded]').length,
       transcriptPillText: (() => {
         const pill = document.querySelector('[data-dsh-picker-transcript-pill]')
@@ -310,13 +326,27 @@ async function runScenario(browser, mode, origin) {
   check('the overlay is mounted', boot.present === true)
   check(
     'a sent element block is folded into a pill',
-    boot.transcriptPills === 1 && boot.transcriptFoldedLines >= 1 && boot.transcriptHiddenLines === 7,
+    // Two shapes in the fixture: the block split over lines, and the same block
+    // inside one run that also carries the user's words.
+    boot.transcriptPills === 2 && boot.transcriptFoldedLines >= 1 && boot.transcriptHiddenLines === 7,
     JSON.stringify(boot),
   )
   check(
     'the pill carries the element summary',
     /完全权限/.test(boot.transcriptPillText ?? '') && !/\[元素\]/.test(boot.transcriptPillText ?? ''),
     String(boot.transcriptPillText),
+  )
+  check(
+    'the sent badge looks like the composer chip: same icon, same label',
+    boot.transcriptRun?.pillIcon === true && /元素 span「完全权限」/.test(boot.transcriptRun?.pillLabel ?? ''),
+    JSON.stringify(boot.transcriptRun),
+  )
+  check(
+    "a run folds only the block, and the user's own words stay",
+    boot.transcriptRun?.hiddenDisplay === 'none' &&
+      boot.transcriptRun?.hiddenHasBlock === true &&
+      boot.transcriptRun?.userWordsVisible === true,
+    JSON.stringify(boot.transcriptRun),
   )
   check(
     'the folded lines are hidden but still in the document',

@@ -148,6 +148,18 @@
         throw new Error('unexpected platform module: ' + id)
       })
 
+      // DSH renders a plain message as one run: the lead sentence, the block and
+      // the user's own words in a single text node. Set it the way the app does.
+      var sentRun = document.getElementById('sent-run')
+      if (sentRun !== null) {
+        sentRun.textContent = [
+          '我选取了 1 个界面元素，以下是定位信息：',
+          '[元素] span "完全权限"',
+          '[选择器] span.Sh0Q9G_triggerLabel',
+          '[源码] …/skeleton/InputBar.tsx',
+          '把这个按钮往左移一点',
+        ].join(String.fromCharCode(10))
+      }
       window.__harness.exports = exports
 
       var extra = {}
