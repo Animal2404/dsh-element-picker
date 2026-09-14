@@ -194,7 +194,6 @@ function foldBlock({ doc, first }) {
 
 /** A block hidden inside a text run, split out of the run's own text node. */
 const RUN_MARKER = 'data-dsh-picker-folded-run'
-const LF = String.fromCharCode(10)
 
 /**
  * Build the pill that stands in for a block.
@@ -244,7 +243,7 @@ function createPill({ doc, text }) {
  * @returns {{ start: number, end: number } | null} Offsets, or null when the text holds no block.
  */
 function blockRangeIn(text) {
-  const lines = String(text ?? '').split(LF)
+  const lines = String(text ?? '').split(String.fromCharCode(10))
   if (lines.length < 2) return null
   let start = -1
   let end = -1
