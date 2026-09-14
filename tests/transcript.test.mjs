@@ -205,7 +205,8 @@ test("a run that also holds the user's words folds only the block", () => {
   assert.equal(kept.length, 1, 'the sentence is not hidden')
   assert.equal(run.textContent, original, 'the text is unchanged, only split')
 
-  // The pill is the block's toggle, and it is not the user's sentence.
+  // The pill sits outside the run, so the message text is untouched by it.
+  assert.equal(pill.parentElement === run, false, 'the badge is not part of the message text')
   assert.equal(pill.getAttribute('aria-expanded'), 'false')
   pill.dispatchEvent(createEvent('click'))
   assert.equal(pill.getAttribute('aria-expanded'), 'true')
@@ -248,7 +249,7 @@ test('the pill label is one line: the element, not the whole block', () => {
   one.textContent = '[元素] div.uV2eYG_input' + ' ' + String.fromCharCode(65372) + ' [选择器] div[data-composer-input="true"]' + ' ' + String.fromCharCode(65372) + ' [源码] …/InputBar.tsx'
   compact.body.appendChild(one)
   assert.equal(foldTranscriptBlocks(compact), 1)
-  assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent.includes('div.uV2eYG_input'), true)
+  assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent, '❯元素 div')
   assert.equal(compact.querySelectorAll(`[${PILL_MARKER}]`)[0].textContent.includes('[选择器]'), false)
 })
 

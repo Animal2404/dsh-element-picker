@@ -319,9 +319,13 @@ function foldRunBlock({ doc, element, range }) {
   const after = text.slice(range.end)
   element.textContent = ''
   appendText({ doc, host: element, text: before })
-  element.appendChild(pill)
   element.appendChild(wrapper)
   appendText({ doc, host: element, text: after })
+  // The pill sits outside the run, so the message's own text stays exactly what
+  // was sent (the badge is not part of it).
+  const host = element.parentElement ?? element.parentNode
+  if (host !== null && host !== undefined && typeof host.insertBefore === 'function') host.insertBefore(pill, element)
+  else element.insertBefore(pill, element.firstChild)
 
   const toggle = (event) => {
     event.preventDefault()
